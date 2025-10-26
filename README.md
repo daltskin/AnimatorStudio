@@ -89,13 +89,6 @@ To capture animated GIFs, switch to the desired timeline range, click **Export G
 
 Reusable demos live under `samples/` so you can import them from the toolbar’s scene picker:
 
-- `samples/record-player.json` — spinning vinyl, animated tonearm, and glowing highlight.
-- `samples/emoji-emotions.json` — emoji face cycling through quick mood swaps.
-- `samples/bouncing-ball-loop.json` — side-to-side bounce with squash-and-stretch.
-- `samples/typing-text-reveal.json` — typewriter-style reveal with a blinking caret.
-- `samples/car-assembly.json` — chassis, roof, and wheels easing into place.
-- `samples/emoji-routing.json` — three emoji vehicles moving along diverging routes.
-
 ## ✅ Testing
 
 The project ships with Playwright end-to-end specs that cover the canvas, timeline, context menus, and export flows.
