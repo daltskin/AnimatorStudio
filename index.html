@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Animator Studio</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@400;500;600;700&family=Merriweather:wght@400;700&family=Poppins:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="app-brand">
+          <img src="images/logo_small.png" alt="Animator Studio Logo" />
+          <h1>Animator Studio</h1>
+        </div>
+        <div class="header-actions">
+          <button type="button" id="clearCanvas" class="ghost" title="Clear the entire canvas">Clear canvas</button>
+          <details class="export-menu action-group">
+            <summary class="menu-button" aria-haspopup="listbox" title="Open sharing and export options">Share &amp; export</summary>
+            <div class="menu-list" role="listbox">
+              <button type="button" id="importScene" class="ghost" role="option" title="Import a saved scene">Import scene</button>
+              <input type="file" id="importSceneInput" accept="application/json" hidden />
+              <button type="button" id="exportScene" class="ghost" role="option" title="Export the current scene as JSON">Export scene (.json)</button>
+              <button type="button" id="exportGif" class="ghost" role="option" title="Export an animated GIF">Export GIF</button>
+              <p id="exportStatus" data-variant="idle" aria-live="polite">Exporter standing by</p>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <div class="workspace">
+        <aside class="toolbar" aria-label="Editor controls">
+          <div class="toolbar-section">
+            <h2>Appearance</h2>
+            <div class="control color-controls" role="group" aria-label="Fill and stroke colours">
+              <label class="color-control">
+                <span class="control-label">Fill</span>
+                <input type="color" id="fillColor" value="#ff6b6b" title="Pick the fill colour" />
+              </label>
+              <label class="color-control">
+                <span class="control-label">Stroke</span>
+                <input type="color" id="strokeColor" value="#1f2937" title="Pick the stroke colour" />
+              </label>
+            </div>
+            <label class="control">
+              <span class="control-label">Stroke width</span>
+              <input type="range" id="strokeWidth" min="1" max="12" value="3" title="Adjust stroke width" />
+              <span id="strokeWidthValue" class="value">3px</span>
+            </label>
+            <div class="control icon-toggle-group" id="sketchControl">
+              <span class="control-label">Sketchiness</span>
+              <div class="icon-toggle-row" role="radiogroup" aria-label="Sketchiness">
+                <button type="button" class="icon-toggle" data-sketch-level="0" aria-pressed="true" title="Use clean strokes">
+                  <span class="sr-only">Clean</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 12h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" class="icon-toggle" data-sketch-level="1" aria-pressed="false" title="Add subtle wobble">
+                  <span class="sr-only">Casual</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 12c3 0 3-4 6-4s3 4 6 4 3-4 6-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" class="icon-toggle" data-sketch-level="2" aria-pressed="false" title="Make lines feel hand-drawn">
+                  <span class="sr-only">Messy</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 11.5c2 3 4-3 6-1.5s2 4.5 4 3 2-4 4-2 2 4 4 1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <label class="control">
+              <span class="control-label">Font family</span>
+              <select id="fontFamily" title="Choose the font for text shapes">
+                <option value="Inter" selected>Inter</option>
+                <option value="Poppins">Poppins</option>
+                <option value="Merriweather">Merriweather</option>
+                <option value="IBM Plex Mono">IBM Plex Mono</option>
+              </select>
+            </label>
+            <div class="control icon-toggle-group arrow-ending-control" id="arrowEndingControl" hidden>
+              <span class="control-label">Arrow endings</span>
+              <div class="icon-toggle-row" role="group" aria-label="Arrow endings">
+                <button type="button" class="icon-toggle" data-arrow-toggle="start" aria-pressed="false" title="Toggle arrowhead at the start of the line">
+                  <span class="sr-only">Toggle arrowhead at start</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M8 12l6-4v3h6v2h-6v3z" fill="currentColor" />
+                    <path d="M4 12h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" class="icon-toggle" data-arrow-toggle="end" aria-pressed="true" title="Toggle arrowhead at the end of the line">
+                  <span class="sr-only">Toggle arrowhead at end</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M16 12l-6 4v-3H4v-2h6V8z" fill="currentColor" />
+                    <path d="M20 12h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar-section tips" data-tips>
+            <div class="tips-header">
+              <h2>Tips</h2>
+            </div>
+            <ul id="tipsList"></ul>
+          </div>
+        </aside>
+
+        <section class="stage-area">
+          <div class="canvas-wrapper">
+            <div class="floating-tool-menu" aria-label="Canvas tools and actions">
+              <div class="tool-cluster" role="radiogroup" aria-label="Shape tools">
+                <button data-tool="select" class="tool-button selected" aria-pressed="true" aria-label="Select tool" title="Select existing shapes">
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M6.5 4.25l5.05 12.19 1.62-3.73 3.83 3.83 1.77-1.77-3.83-3.83 3.73-1.62L6.5 4.25z" fill="currentColor" />
+                  </svg>
+                  <span class="tool-label">Select</span>
+                </button>
+                <button data-tool="rectangle" class="tool-button" aria-pressed="false" aria-label="Rectangle tool" title="Draw a rectangle">
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="4" y="7" width="16" height="10" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                  </svg>
+                  <span class="tool-label">Rectangle</span>
+                </button>
+                <button data-tool="square" class="tool-button" aria-pressed="false" aria-label="Square tool" title="Draw a square">
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="6" y="6" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                  </svg>
+                  <span class="tool-label">Square</span>
+                </button>
+                <button data-tool="circle" class="tool-button" aria-pressed="false" aria-label="Circle tool" title="Draw a circle">
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.8" />
+                  </svg>
+                  <span class="tool-label">Circle</span>
+                </button>
+                <button data-tool="arrow" class="tool-button" aria-pressed="false" aria-label="Arrow tool" title="Draw an arrow connector">
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M5 12h9.17l-3.58-3.59L12 7l6 6-6 6-1.41-1.41L14.17 13H5z" fill="currentColor" />
+                  </svg>
+                  <span class="tool-label">Arrow</span>
+                </button>
+                <button data-tool="free" class="tool-button" aria-pressed="false" aria-label="Free draw tool" title="Sketch freehand lines">
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 16c1-3.5 3.2-4.8 5.4-3 2.2 1.8 4 .8 5.6-1.2 1.6-2 3.4-2.8 5.6-.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M6 9c.8-2.2 2.6-3.6 4.6-3 1.4.4 2.3 1.5 2.9 2.6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <span class="tool-label">Free draw</span>
+                </button>
+                <button data-tool="text" class="tool-button" aria-pressed="false" aria-label="Text tool" title="Add text">
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M6 5h12v2h-5v12h-2V7H6z" fill="currentColor" />
+                  </svg>
+                  <span class="tool-label">Text</span>
+                </button>
+              </div>
+              <span class="tool-divider" aria-hidden="true"></span>
+              <div class="tool-cluster" role="group" aria-label="Grouping actions">
+                <button type="button" id="groupShapes" class="tool-button" aria-label="Group selection" title="Group selected shapes" disabled>
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="5" y="6" width="10" height="10" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+                    <rect x="9" y="10" width="10" height="10" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+                  </svg>
+                  <span class="tool-label">Group</span>
+                </button>
+                <button type="button" id="ungroupShapes" class="tool-button" aria-label="Ungroup selection" title="Ungroup selected shapes" disabled>
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="5" y="6" width="8" height="8" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+                    <rect x="11" y="12" width="8" height="8" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.6" />
+                    <path d="M9.5 10.5l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                  <span class="tool-label">Ungroup</span>
+                </button>
+              </div>
+            </div>
+            <div class="stage-surface">
+              <canvas id="stage" width="1280" height="720" role="application" aria-label="Animation canvas"></canvas>
+              <div id="stageDimensions" class="stage-dimensions" aria-live="polite">1280 × 720 px</div>
+              <button type="button" id="stageResizeHandle" class="stage-resize-handle stage-resize-handle--corner" data-stage-resize="corner" aria-label="Resize canvas" title="Drag to resize the canvas">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M8 16l8-8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                  <path d="M11 19l8-8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                </svg>
+              </button>
+              <button type="button" class="stage-resize-handle stage-resize-handle--right" data-stage-resize="right" aria-label="Resize canvas width" title="Drag to adjust canvas width">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M10 6l4 6-4 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                </svg>
+              </button>
+              <button type="button" class="stage-resize-handle stage-resize-handle--bottom" data-stage-resize="bottom" aria-label="Resize canvas height" title="Drag to adjust canvas height">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M6 10l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M12 6v12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                </svg>
+              </button>
+              <div id="marqueeOverlay" class="marquee-overlay" hidden aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <section class="timeline" aria-label="Animation timeline">
+            <header class="timeline-header">
+              <div class="timeline-controls">
+                <button id="playToggle" class="primary" title="Play or pause the animation">Play</button>
+                <button id="stopPlayback" class="ghost" title="Stop playback and reset">Stop</button>
+                <button id="addKeyframe" class="ghost" disabled title="Add a keyframe at the current time">Add keyframe</button>
+              </div>
+              <div class="timeline-info">
+                <label class="control compact">
+                  <span>Duration</span>
+                  <input type="number" id="timelineDuration" min="1" max="120" value="5" title="Change the animation duration" />
+                  <span class="suffix">s</span>
+                </label>
+                <label class="toggle-checkbox" id="loopToggleLabel">
+                  <input type="checkbox" id="loopToggle" checked title="Loop playback" />
+                  <span class="toggle-checkbox__state">Loop</span>
+                </label>
+                <label class="toggle-checkbox" id="bounceToggleLabel">
+                  <input type="checkbox" id="bounceToggle" title="Bounce playback back and forth" />
+                  <span class="toggle-checkbox__state">Bounce</span>
+                </label>
+                <label class="control compact">
+                  <span>Export FPS</span>
+                  <input type="number" id="exportFps" min="1" max="60" value="12" title="Set frames per second for exports" />
+                </label>
+                <div class="time-display">
+                  <span id="currentTime">0.0s</span>
+                </div>
+              </div>
+            </header>
+
+            <div class="timeline-body">
+              <input type="range" id="timelineRange" min="0" max="1000" value="0" title="Scrub through the animation timeline" />
+              <div class="timeline-track" id="timelineTrack">
+                <div class="timeline-marker" style="left: 0%"></div>
+              </div>
+              <div class="keyframe-panel">
+                <h3>Keyframes</h3>
+                <div id="keyframeList" class="keyframe-list" aria-live="polite"></div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </div>
+    </div>
+
+    <div id="stageContextMenu" class="context-menu" role="menu" hidden aria-hidden="true">
+      <div class="context-menu__section">
+        <label class="context-menu__label" for="stageBackgroundColor">Stage background</label>
+        <input type="color" id="stageBackgroundColor" value="#ffffff" aria-label="Pick stage background colour" />
+      </div>
+      <button type="button" data-stage-action="reset-background" role="menuitem">Reset background colour</button>
+    </div>
+
+    <div id="shapeContextMenu" class="context-menu" role="menu" hidden aria-hidden="true">
+      <button type="button" data-z-action="bring-forward" role="menuitem">Bring forward</button>
+      <button type="button" data-z-action="send-backward" role="menuitem">Send backward</button>
+      <button type="button" data-z-action="bring-to-front" role="menuitem">Bring to front</button>
+      <button type="button" data-z-action="send-to-back" role="menuitem">Send to back</button>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

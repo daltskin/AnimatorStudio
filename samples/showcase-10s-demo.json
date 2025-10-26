@@ -1,0 +1,917 @@
+{
+    "version": 1,
+    "duration": 10,
+    "stage": {
+        "width": 1280,
+        "height": 720
+    },
+    "timeline": {
+        "duration": 10,
+        "loop": true,
+        "bounce": false,
+        "exportFps": 24
+    },
+    "shapes": [
+        {
+            "id": 1,
+            "type": "rectangle",
+            "style": {
+                "fill": "#0b1f3a",
+                "stroke": "#0b1f3a",
+                "strokeWidth": 0,
+                "sketchLevel": 0,
+                "arrowStart": false,
+                "arrowEnd": true,
+                "opacity": 1,
+                "fontFamily": "Inter",
+                "fontSize": 32,
+                "rotation": 0
+            },
+            "live": {
+                "x": 0,
+                "y": 0,
+                "width": 1280,
+                "height": 720,
+                "rotation": 0
+            },
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#0b1f3a",
+                            "stroke": "#0b1f3a",
+                            "strokeWidth": 0,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 0,
+                            "y": 0,
+                            "width": 1280,
+                            "height": 720,
+                            "rotation": 0
+                        }
+                    }
+                }
+            ],
+            "birthTime": 0,
+            "isVisible": true
+        },
+        {
+            "id": 2,
+            "type": "square",
+            "style": {
+                "fill": "#2f1e4f",
+                "stroke": "#140b33",
+                "strokeWidth": 6,
+                "sketchLevel": 1,
+                "arrowStart": false,
+                "arrowEnd": true,
+                "opacity": 1,
+                "fontFamily": "Inter",
+                "fontSize": 32,
+                "rotation": 0
+            },
+            "live": {
+                "x": 160,
+                "y": 360,
+                "width": 220,
+                "height": 220,
+                "rotation": 0
+            },
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "square",
+                        "style": {
+                            "fill": "#2f1e4f",
+                            "stroke": "#140b33",
+                            "strokeWidth": 6,
+                            "sketchLevel": 1,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 160,
+                            "y": 360,
+                            "width": 220,
+                            "height": 220,
+                            "rotation": 0
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "square",
+                        "style": {
+                            "fill": "#462a79",
+                            "stroke": "#140b33",
+                            "strokeWidth": 6,
+                            "sketchLevel": 1,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 10
+                        },
+                        "live": {
+                            "x": 160,
+                            "y": 340,
+                            "width": 220,
+                            "height": 220,
+                            "rotation": 0.17453292519943295
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "square",
+                        "style": {
+                            "fill": "#341d5c",
+                            "stroke": "#140b33",
+                            "strokeWidth": 6,
+                            "sketchLevel": 1,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": -8
+                        },
+                        "live": {
+                            "x": 160,
+                            "y": 360,
+                            "width": 220,
+                            "height": 220,
+                            "rotation": -0.13962634015954636
+                        }
+                    }
+                }
+            ],
+            "birthTime": 0,
+            "isVisible": true
+        },
+        {
+            "id": 3,
+            "type": "circle",
+            "style": {
+                "fill": "#ffd166",
+                "stroke": "#ff9f1c",
+                "strokeWidth": 6,
+                "sketchLevel": 0,
+                "arrowStart": false,
+                "arrowEnd": true,
+                "opacity": 1,
+                "fontFamily": "Inter",
+                "fontSize": 32,
+                "rotation": 0
+            },
+            "live": {
+                "x": 950,
+                "y": 90,
+                "width": 140,
+                "height": 140,
+                "rotation": 0
+            },
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "circle",
+                        "style": {
+                            "fill": "#ffd166",
+                            "stroke": "#ff9f1c",
+                            "strokeWidth": 6,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 950,
+                            "y": 90,
+                            "width": 140,
+                            "height": 140,
+                            "rotation": 0
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "circle",
+                        "style": {
+                            "fill": "#ffe066",
+                            "stroke": "#ff9f1c",
+                            "strokeWidth": 6,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 760,
+                            "y": 70,
+                            "width": 140,
+                            "height": 140,
+                            "rotation": 0
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "circle",
+                        "style": {
+                            "fill": "#f9c74f",
+                            "stroke": "#ff9f1c",
+                            "strokeWidth": 6,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 560,
+                            "y": 120,
+                            "width": 140,
+                            "height": 140,
+                            "rotation": 0
+                        }
+                    }
+                }
+            ],
+            "birthTime": 0,
+            "isVisible": true
+        },
+        {
+            "id": 4,
+            "type": "arrow",
+            "style": {
+                "fill": "#f3722c",
+                "stroke": "#f94144",
+                "strokeWidth": 8,
+                "sketchLevel": 0,
+                "arrowStart": false,
+                "arrowEnd": true,
+                "opacity": 1,
+                "fontFamily": "Inter",
+                "fontSize": 32,
+                "rotation": 0
+            },
+            "live": {
+                "start": {
+                    "x": 1180,
+                    "y": 220
+                },
+                "end": {
+                    "x": 1030,
+                    "y": 160
+                }
+            },
+            "keyframes": [
+                {
+                    "time": 1,
+                    "snapshot": {
+                        "type": "arrow",
+                        "style": {
+                            "fill": "#f3722c",
+                            "stroke": "#f94144",
+                            "strokeWidth": 8,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "start": {
+                                "x": 1180,
+                                "y": 220
+                            },
+                            "end": {
+                                "x": 1030,
+                                "y": 160
+                            }
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "arrow",
+                        "style": {
+                            "fill": "#f3722c",
+                            "stroke": "#f94144",
+                            "strokeWidth": 8,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "start": {
+                                "x": 900,
+                                "y": 200
+                            },
+                            "end": {
+                                "x": 720,
+                                "y": 140
+                            }
+                        }
+                    }
+                },
+                {
+                    "time": 9,
+                    "snapshot": {
+                        "type": "arrow",
+                        "style": {
+                            "fill": "#f3722c",
+                            "stroke": "#f94144",
+                            "strokeWidth": 8,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "start": {
+                                "x": 540,
+                                "y": 260
+                            },
+                            "end": {
+                                "x": 360,
+                                "y": 180
+                            }
+                        }
+                    }
+                }
+            ],
+            "birthTime": 0,
+            "isVisible": true
+        },
+        {
+            "id": 5,
+            "type": "line",
+            "style": {
+                "fill": "#1f2937",
+                "stroke": "#1f2937",
+                "strokeWidth": 4,
+                "sketchLevel": 0,
+                "arrowStart": false,
+                "arrowEnd": false,
+                "opacity": 1,
+                "fontFamily": "Inter",
+                "fontSize": 32,
+                "rotation": 0
+            },
+            "live": {
+                "start": {
+                    "x": 0,
+                    "y": 520
+                },
+                "end": {
+                    "x": 1280,
+                    "y": 520
+                }
+            },
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "line",
+                        "style": {
+                            "fill": "#1f2937",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 4,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": false,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "start": {
+                                "x": 0,
+                                "y": 520
+                            },
+                            "end": {
+                                "x": 1280,
+                                "y": 520
+                            }
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "line",
+                        "style": {
+                            "fill": "#1f2937",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 4,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": false,
+                            "opacity": 1,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "start": {
+                                "x": 0,
+                                "y": 520
+                            },
+                            "end": {
+                                "x": 1280,
+                                "y": 520
+                            }
+                        }
+                    }
+                }
+            ],
+            "birthTime": 0,
+            "isVisible": true
+        },
+        {
+            "id": 6,
+            "type": "free",
+            "style": {
+                "fill": "transparent",
+                "stroke": "#06d6a0",
+                "strokeWidth": 6,
+                "sketchLevel": 2,
+                "arrowStart": false,
+                "arrowEnd": false,
+                "opacity": 0.85,
+                "fontFamily": "Inter",
+                "fontSize": 32,
+                "rotation": 0
+            },
+            "live": {
+                "points": [
+                    {
+                        "x": 0,
+                        "y": 200
+                    },
+                    {
+                        "x": 160,
+                        "y": 160
+                    },
+                    {
+                        "x": 320,
+                        "y": 210
+                    },
+                    {
+                        "x": 480,
+                        "y": 150
+                    },
+                    {
+                        "x": 640,
+                        "y": 220
+                    },
+                    {
+                        "x": 800,
+                        "y": 170
+                    },
+                    {
+                        "x": 960,
+                        "y": 230
+                    },
+                    {
+                        "x": 1120,
+                        "y": 180
+                    },
+                    {
+                        "x": 1280,
+                        "y": 220
+                    }
+                ]
+            },
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "free",
+                        "style": {
+                            "fill": "transparent",
+                            "stroke": "#06d6a0",
+                            "strokeWidth": 6,
+                            "sketchLevel": 2,
+                            "arrowStart": false,
+                            "arrowEnd": false,
+                            "opacity": 0.85,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "points": [
+                                {
+                                    "x": 0,
+                                    "y": 200
+                                },
+                                {
+                                    "x": 160,
+                                    "y": 160
+                                },
+                                {
+                                    "x": 320,
+                                    "y": 210
+                                },
+                                {
+                                    "x": 480,
+                                    "y": 150
+                                },
+                                {
+                                    "x": 640,
+                                    "y": 220
+                                },
+                                {
+                                    "x": 800,
+                                    "y": 170
+                                },
+                                {
+                                    "x": 960,
+                                    "y": 230
+                                },
+                                {
+                                    "x": 1120,
+                                    "y": 180
+                                },
+                                {
+                                    "x": 1280,
+                                    "y": 220
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "free",
+                        "style": {
+                            "fill": "transparent",
+                            "stroke": "#06d6a0",
+                            "strokeWidth": 6,
+                            "sketchLevel": 2,
+                            "arrowStart": false,
+                            "arrowEnd": false,
+                            "opacity": 0.85,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "points": [
+                                {
+                                    "x": 0,
+                                    "y": 260
+                                },
+                                {
+                                    "x": 160,
+                                    "y": 220
+                                },
+                                {
+                                    "x": 320,
+                                    "y": 270
+                                },
+                                {
+                                    "x": 480,
+                                    "y": 210
+                                },
+                                {
+                                    "x": 640,
+                                    "y": 280
+                                },
+                                {
+                                    "x": 800,
+                                    "y": 230
+                                },
+                                {
+                                    "x": 960,
+                                    "y": 290
+                                },
+                                {
+                                    "x": 1120,
+                                    "y": 240
+                                },
+                                {
+                                    "x": 1280,
+                                    "y": 280
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "free",
+                        "style": {
+                            "fill": "transparent",
+                            "stroke": "#06d6a0",
+                            "strokeWidth": 6,
+                            "sketchLevel": 2,
+                            "arrowStart": false,
+                            "arrowEnd": false,
+                            "opacity": 0.85,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "points": [
+                                {
+                                    "x": 0,
+                                    "y": 200
+                                },
+                                {
+                                    "x": 160,
+                                    "y": 160
+                                },
+                                {
+                                    "x": 320,
+                                    "y": 210
+                                },
+                                {
+                                    "x": 480,
+                                    "y": 150
+                                },
+                                {
+                                    "x": 640,
+                                    "y": 220
+                                },
+                                {
+                                    "x": 800,
+                                    "y": 170
+                                },
+                                {
+                                    "x": 960,
+                                    "y": 230
+                                },
+                                {
+                                    "x": 1120,
+                                    "y": 180
+                                },
+                                {
+                                    "x": 1280,
+                                    "y": 220
+                                }
+                            ]
+                        }
+                    }
+                }
+            ],
+            "birthTime": 0,
+            "isVisible": true
+        },
+        {
+            "id": 7,
+            "type": "text",
+            "style": {
+                "fill": "#ffffff",
+                "stroke": "#ffffff",
+                "strokeWidth": 0,
+                "sketchLevel": 0,
+                "arrowStart": false,
+                "arrowEnd": true,
+                "opacity": 0.0,
+                "fontFamily": "Poppins",
+                "fontSize": 48,
+                "rotation": -6
+            },
+            "live": {
+                "x": 140,
+                "y": 40,
+                "width": 640,
+                "height": 120,
+                "rotation": -0.10471975511965978,
+                "text": "Animator Studio Showcase"
+            },
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "text",
+                        "style": {
+                            "fill": "#ffffff",
+                            "stroke": "#ffffff",
+                            "strokeWidth": 0,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 0.0,
+                            "fontFamily": "Poppins",
+                            "fontSize": 48,
+                            "rotation": -6
+                        },
+                        "live": {
+                            "x": 140,
+                            "y": 40,
+                            "width": 640,
+                            "height": 120,
+                            "rotation": -0.10471975511965978,
+                            "text": "Animator Studio Showcase"
+                        }
+                    }
+                },
+                {
+                    "time": 4,
+                    "snapshot": {
+                        "type": "text",
+                        "style": {
+                            "fill": "#ffffff",
+                            "stroke": "#ffffff",
+                            "strokeWidth": 0,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 0.75,
+                            "fontFamily": "Poppins",
+                            "fontSize": 48,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 260,
+                            "y": 40,
+                            "width": 640,
+                            "height": 120,
+                            "rotation": 0.0,
+                            "text": "Animator Studio Showcase"
+                        }
+                    }
+                },
+                {
+                    "time": 9,
+                    "snapshot": {
+                        "type": "text",
+                        "style": {
+                            "fill": "#ffffff",
+                            "stroke": "#ffffff",
+                            "strokeWidth": 0,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 1.0,
+                            "fontFamily": "Poppins",
+                            "fontSize": 48,
+                            "rotation": 4
+                        },
+                        "live": {
+                            "x": 300,
+                            "y": 40,
+                            "width": 640,
+                            "height": 120,
+                            "rotation": 0.06981317007977318,
+                            "text": "Animator Studio Showcase"
+                        }
+                    }
+                }
+            ],
+            "birthTime": 0,
+            "isVisible": true
+        },
+        {
+            "id": 8,
+            "type": "image",
+            "style": {
+                "fill": "#ffffff",
+                "stroke": "#ffffff",
+                "strokeWidth": 0,
+                "sketchLevel": 0,
+                "arrowStart": false,
+                "arrowEnd": true,
+                "opacity": 0.85,
+                "fontFamily": "Inter",
+                "fontSize": 32,
+                "rotation": 0
+            },
+            "live": {
+                "x": 80,
+                "y": 420,
+                "width": 180,
+                "height": 180,
+                "rotation": 0
+            },
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "image",
+                        "style": {
+                            "fill": "#ffffff",
+                            "stroke": "#ffffff",
+                            "strokeWidth": 0,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 0.85,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 80,
+                            "y": 420,
+                            "width": 180,
+                            "height": 180,
+                            "rotation": 0.0
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "image",
+                        "style": {
+                            "fill": "#ffffff",
+                            "stroke": "#ffffff",
+                            "strokeWidth": 0,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 0.85,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": 12
+                        },
+                        "live": {
+                            "x": 560,
+                            "y": 400,
+                            "width": 180,
+                            "height": 180,
+                            "rotation": 0.20943951023931956
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "image",
+                        "style": {
+                            "fill": "#ffffff",
+                            "stroke": "#ffffff",
+                            "strokeWidth": 0,
+                            "sketchLevel": 0,
+                            "arrowStart": false,
+                            "arrowEnd": true,
+                            "opacity": 0.85,
+                            "fontFamily": "Inter",
+                            "fontSize": 32,
+                            "rotation": -6
+                        },
+                        "live": {
+                            "x": 900,
+                            "y": 380,
+                            "width": 180,
+                            "height": 180,
+                            "rotation": -0.10471975511965978
+                        }
+                    }
+                }
+            ],
+            "asset": {
+                "source": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII="
+            },
+            "birthTime": 0,
+            "isVisible": true
+        }
+    ]
+}

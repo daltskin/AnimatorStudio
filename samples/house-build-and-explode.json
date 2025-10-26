@@ -1,0 +1,916 @@
+{
+    "version": 1,
+    "duration": 10,
+    "loop": false,
+    "bounce": false,
+    "exportFps": 30,
+    "shapes": [
+        {
+            "id": 1,
+            "type": "rectangle",
+            "style": {
+                "fill": "#f97316",
+                "stroke": "#78350f",
+                "strokeWidth": 6,
+                "opacity": 1,
+                "rotation": -5
+            },
+            "live": {
+                "x": 79.958,
+                "y": 454.545,
+                "width": 380,
+                "height": 200
+            },
+            "bindings": null,
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#f97316",
+                            "stroke": "#78350f",
+                            "strokeWidth": 6,
+                            "opacity": 1,
+                            "rotation": -5
+                        },
+                        "live": {
+                            "x": 79.958,
+                            "y": 454.545,
+                            "width": 380,
+                            "height": 200
+                        }
+                    }
+                },
+                {
+                    "time": 2.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#f97316",
+                            "stroke": "#78350f",
+                            "strokeWidth": 6,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 434.582,
+                            "y": 443.636,
+                            "width": 380,
+                            "height": 200
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fb923c",
+                            "stroke": "#78350f",
+                            "strokeWidth": 6,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 434.582,
+                            "y": 443.636,
+                            "width": 380,
+                            "height": 200
+                        }
+                    }
+                },
+                {
+                    "time": 7.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#f97316",
+                            "stroke": "#451a03",
+                            "strokeWidth": 8,
+                            "opacity": 1,
+                            "rotation": 8
+                        },
+                        "live": {
+                            "x": 419.598,
+                            "y": 465.455,
+                            "width": 420,
+                            "height": 180
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#f97316",
+                            "stroke": "#78350f",
+                            "strokeWidth": 6,
+                            "opacity": 0.8,
+                            "rotation": -12
+                        },
+                        "live": {
+                            "x": 40,
+                            "y": 600,
+                            "width": 400,
+                            "height": 200
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "type": "free",
+            "style": {
+                "fill": "#dc2626",
+                "stroke": "#7f1d1d",
+                "strokeWidth": 6,
+                "opacity": 1,
+                "rotation": 0
+            },
+            "live": {
+                "points": [
+                    {
+                        "x": 169.862,
+                        "y": 312.727
+                    },
+                    {
+                        "x": 259.767,
+                        "y": 203.636
+                    },
+                    {
+                        "x": 349.672,
+                        "y": 312.727
+                    },
+                    {
+                        "x": 169.862,
+                        "y": 312.727
+                    }
+                ]
+            },
+            "bindings": null,
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "free",
+                        "style": {
+                            "fill": "#dc2626",
+                            "stroke": "#7f1d1d",
+                            "strokeWidth": 6,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "points": [
+                                {
+                                    "x": 169.862,
+                                    "y": 312.727
+                                },
+                                {
+                                    "x": 259.767,
+                                    "y": 203.636
+                                },
+                                {
+                                    "x": 349.672,
+                                    "y": 312.727
+                                },
+                                {
+                                    "x": 169.862,
+                                    "y": 312.727
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "time": 2.5,
+                    "snapshot": {
+                        "type": "free",
+                        "style": {
+                            "fill": "#dc2626",
+                            "stroke": "#7f1d1d",
+                            "strokeWidth": 6,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "points": [
+                                {
+                                    "x": 434.582,
+                                    "y": 443.636
+                                },
+                                {
+                                    "x": 529.481,
+                                    "y": 367.273
+                                },
+                                {
+                                    "x": 624.381,
+                                    "y": 443.636
+                                },
+                                {
+                                    "x": 434.582,
+                                    "y": 443.636
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "free",
+                        "style": {
+                            "fill": "#ef4444",
+                            "stroke": "#7f1d1d",
+                            "strokeWidth": 6,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "points": [
+                                {
+                                    "x": 434.582,
+                                    "y": 443.636
+                                },
+                                {
+                                    "x": 529.481,
+                                    "y": 367.273
+                                },
+                                {
+                                    "x": 624.381,
+                                    "y": 443.636
+                                },
+                                {
+                                    "x": 434.582,
+                                    "y": 443.636
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "time": 7.5,
+                    "snapshot": {
+                        "type": "free",
+                        "style": {
+                            "fill": "#dc2626",
+                            "stroke": "#7f1d1d",
+                            "strokeWidth": 8,
+                            "opacity": 1,
+                            "rotation": 12
+                        },
+                        "live": {
+                            "points": [
+                                {
+                                    "x": 349.672,
+                                    "y": 378.182
+                                },
+                                {
+                                    "x": 529.481,
+                                    "y": 290.909
+                                },
+                                {
+                                    "x": 709.291,
+                                    "y": 389.091
+                                },
+                                {
+                                    "x": 349.672,
+                                    "y": 378.182
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "free",
+                        "style": {
+                            "fill": "#dc2626",
+                            "stroke": "#7f1d1d",
+                            "strokeWidth": 6,
+                            "opacity": 0.8,
+                            "rotation": -18
+                        },
+                        "live": {
+                            "points": [
+                                {
+                                    "x": 79.958,
+                                    "y": 160
+                                },
+                                {
+                                    "x": 239.788,
+                                    "y": 40
+                                },
+                                {
+                                    "x": 399.619,
+                                    "y": 160
+                                },
+                                {
+                                    "x": 79.958,
+                                    "y": 160
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": 3,
+            "type": "rectangle",
+            "style": {
+                "fill": "#431407",
+                "stroke": "#1f2937",
+                "strokeWidth": 4,
+                "opacity": 1,
+                "rotation": -20
+            },
+            "live": {
+                "x": 839.153,
+                "y": 476.364,
+                "width": 80,
+                "height": 140
+            },
+            "bindings": null,
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#431407",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 4,
+                            "opacity": 1,
+                            "rotation": -20
+                        },
+                        "live": {
+                            "x": 839.153,
+                            "y": 476.364,
+                            "width": 80,
+                            "height": 140
+                        }
+                    }
+                },
+                {
+                    "time": 2.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#431407",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 4,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 499.513,
+                            "y": 476.364,
+                            "width": 80,
+                            "height": 140
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#78350f",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 4,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 499.513,
+                            "y": 476.364,
+                            "width": 80,
+                            "height": 140
+                        }
+                    }
+                },
+                {
+                    "time": 7.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#431407",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 5,
+                            "opacity": 1,
+                            "rotation": -25
+                        },
+                        "live": {
+                            "x": 389.63,
+                            "y": 541.818,
+                            "width": 100,
+                            "height": 120
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#431407",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 4,
+                            "opacity": 0.8,
+                            "rotation": -60
+                        },
+                        "live": {
+                            "x": 179.852,
+                            "y": 660,
+                            "width": 90,
+                            "height": 140
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": 4,
+            "type": "rectangle",
+            "style": {
+                "fill": "#fef3c7",
+                "stroke": "#1f2937",
+                "strokeWidth": 3,
+                "opacity": 1,
+                "rotation": 20
+            },
+            "live": {
+                "x": 169.862,
+                "y": 498.182,
+                "width": 90,
+                "height": 90
+            },
+            "bindings": null,
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef3c7",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 3,
+                            "opacity": 1,
+                            "rotation": 20
+                        },
+                        "live": {
+                            "x": 169.862,
+                            "y": 498.182,
+                            "width": 90,
+                            "height": 90
+                        }
+                    }
+                },
+                {
+                    "time": 2.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef3c7",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 3,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 449.566,
+                            "y": 465.455,
+                            "width": 90,
+                            "height": 90
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef08a",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 3,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 449.566,
+                            "y": 465.455,
+                            "width": 90,
+                            "height": 90
+                        }
+                    }
+                },
+                {
+                    "time": 7.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef3c7",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 4,
+                            "opacity": 1,
+                            "rotation": -35
+                        },
+                        "live": {
+                            "x": 329.693,
+                            "y": 410.909,
+                            "width": 110,
+                            "height": 110
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef3c7",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 3,
+                            "opacity": 0.7,
+                            "rotation": -70
+                        },
+                        "live": {
+                            "x": 129.905,
+                            "y": 334.545,
+                            "width": 80,
+                            "height": 80
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": 5,
+            "type": "rectangle",
+            "style": {
+                "fill": "#fef3c7",
+                "stroke": "#1f2937",
+                "strokeWidth": 3,
+                "opacity": 1,
+                "rotation": -20
+            },
+            "live": {
+                "x": 889.101,
+                "y": 498.182,
+                "width": 90,
+                "height": 90
+            },
+            "bindings": null,
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef3c7",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 3,
+                            "opacity": 1,
+                            "rotation": -20
+                        },
+                        "live": {
+                            "x": 889.101,
+                            "y": 498.182,
+                            "width": 90,
+                            "height": 90
+                        }
+                    }
+                },
+                {
+                    "time": 2.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef3c7",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 3,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 569.439,
+                            "y": 465.455,
+                            "width": 90,
+                            "height": 90
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef08a",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 3,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 569.439,
+                            "y": 465.455,
+                            "width": 90,
+                            "height": 90
+                        }
+                    }
+                },
+                {
+                    "time": 7.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef3c7",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 4,
+                            "opacity": 1,
+                            "rotation": 30
+                        },
+                        "live": {
+                            "x": 709.291,
+                            "y": 410.909,
+                            "width": 120,
+                            "height": 110
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#fef3c7",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 3,
+                            "opacity": 0.7,
+                            "rotation": 60
+                        },
+                        "live": {
+                            "x": 919.069,
+                            "y": 312.727,
+                            "width": 80,
+                            "height": 80
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": 6,
+            "type": "rectangle",
+            "style": {
+                "fill": "#9a3412",
+                "stroke": "#451a03",
+                "strokeWidth": 4,
+                "opacity": 1,
+                "rotation": 20
+            },
+            "live": {
+                "x": 189.841,
+                "y": 323.636,
+                "width": 70,
+                "height": 140
+            },
+            "bindings": null,
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#9a3412",
+                            "stroke": "#451a03",
+                            "strokeWidth": 4,
+                            "opacity": 1,
+                            "rotation": 20
+                        },
+                        "live": {
+                            "x": 189.841,
+                            "y": 323.636,
+                            "width": 70,
+                            "height": 140
+                        }
+                    }
+                },
+                {
+                    "time": 2.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#9a3412",
+                            "stroke": "#451a03",
+                            "strokeWidth": 4,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 579.429,
+                            "y": 367.273,
+                            "width": 70,
+                            "height": 140
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#ab4b1d",
+                            "stroke": "#451a03",
+                            "strokeWidth": 4,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 579.429,
+                            "y": 367.273,
+                            "width": 70,
+                            "height": 140
+                        }
+                    }
+                },
+                {
+                    "time": 7.5,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#9a3412",
+                            "stroke": "#451a03",
+                            "strokeWidth": 5,
+                            "opacity": 1,
+                            "rotation": 35
+                        },
+                        "live": {
+                            "x": 739.259,
+                            "y": 247.273,
+                            "width": 90,
+                            "height": 160
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "rectangle",
+                        "style": {
+                            "fill": "#9a3412",
+                            "stroke": "#451a03",
+                            "strokeWidth": 4,
+                            "opacity": 0.8,
+                            "rotation": 80
+                        },
+                        "live": {
+                            "x": 934,
+                            "y": 94.545,
+                            "width": 90,
+                            "height": 160
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "id": 7,
+            "type": "text",
+            "style": {
+                "fill": "#fef08a",
+                "stroke": "#1f2937",
+                "strokeWidth": 2,
+                "fontFamily": "Pacifico",
+                "fontSize": 64,
+                "opacity": 0,
+                "rotation": 0
+            },
+            "live": {
+                "x": 409.608,
+                "y": 312.727,
+                "width": 480,
+                "height": 90,
+                "text": "Home Sweet Home"
+            },
+            "bindings": null,
+            "keyframes": [
+                {
+                    "time": 0,
+                    "snapshot": {
+                        "type": "text",
+                        "style": {
+                            "fill": "#fef08a",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 2,
+                            "fontFamily": "Pacifico",
+                            "fontSize": 64,
+                            "opacity": 0,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 409.608,
+                            "y": 312.727,
+                            "width": 480,
+                            "height": 90,
+                            "text": "Home Sweet Home"
+                        }
+                    }
+                },
+                {
+                    "time": 3,
+                    "snapshot": {
+                        "type": "text",
+                        "style": {
+                            "fill": "#fef08a",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 2,
+                            "fontFamily": "Pacifico",
+                            "fontSize": 64,
+                            "opacity": 0.6,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 419.598,
+                            "y": 312.727,
+                            "width": 480,
+                            "height": 90,
+                            "text": "Home Sweet Home"
+                        }
+                    }
+                },
+                {
+                    "time": 5,
+                    "snapshot": {
+                        "type": "text",
+                        "style": {
+                            "fill": "#fef08a",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 2,
+                            "fontFamily": "Pacifico",
+                            "fontSize": 64,
+                            "opacity": 1,
+                            "rotation": 0
+                        },
+                        "live": {
+                            "x": 419.598,
+                            "y": 312.727,
+                            "width": 480,
+                            "height": 90,
+                            "text": "Home Sweet Home"
+                        }
+                    }
+                },
+                {
+                    "time": 7.5,
+                    "snapshot": {
+                        "type": "text",
+                        "style": {
+                            "fill": "#fef08a",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 3,
+                            "fontFamily": "Pacifico",
+                            "fontSize": 68,
+                            "opacity": 1,
+                            "rotation": -10
+                        },
+                        "live": {
+                            "x": 379.64,
+                            "y": 290.909,
+                            "width": 520,
+                            "height": 100,
+                            "text": "Home Sweet Home"
+                        }
+                    }
+                },
+                {
+                    "time": 10,
+                    "snapshot": {
+                        "type": "text",
+                        "style": {
+                            "fill": "#fef08a",
+                            "stroke": "#1f2937",
+                            "strokeWidth": 2,
+                            "fontFamily": "Pacifico",
+                            "fontSize": 64,
+                            "opacity": 0,
+                            "rotation": -45
+                        },
+                        "live": {
+                            "x": 40,
+                            "y": 214.545,
+                            "width": 520,
+                            "height": 100,
+                            "text": "Home Sweet Home"
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

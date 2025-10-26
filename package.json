@@ -1,0 +1,21 @@
+{
+  "name": "animator",
+  "version": "1.0.0",
+  "description": "Animator Studio is a lightweight web app for building presentation-friendly motion graphics right inside the browser. Drag shapes onto the stage, wire them up with animated connectors, then bring everything to life on a tactile timeline.",
+  "main": "app.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "gifenc": "^1.0.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.1",
+    "http-server": "^14.1.1"
+  }
+}
