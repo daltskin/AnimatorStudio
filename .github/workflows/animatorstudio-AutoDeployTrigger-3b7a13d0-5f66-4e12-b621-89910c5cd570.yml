@@ -1,0 +1,49 @@
+name: Trigger auto deployment for animatorstudio
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ main ]
+    paths:
+    - '**'
+    - '.github/workflows/animatorstudio-AutoDeployTrigger-3b7a13d0-5f66-4e12-b621-89910c5cd570.yml'
+
+  # Allow manual trigger 
+  workflow_dispatch:      
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions: 
+      id-token: write #This is required for requesting the OIDC JWT Token
+      contents: read #Required when GH token is used to authenticate with private repo
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.ANIMATORSTUDIO_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.ANIMATORSTUDIO_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.ANIMATORSTUDIO_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }}
+          _dockerfilePathKey_: _dockerfilePath_
+          _targetLabelKey_: _targetLabel_
+          registryUrl: jdcontainerregistrynortheurope.azurecr.io
+          registryUsername: ${{ secrets.ANIMATORSTUDIO_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.ANIMATORSTUDIO_REGISTRY_PASSWORD }}
+          containerAppName: animatorstudio
+          resourceGroup: Default-Web-NorthEurope
+          imageToBuild: jdcontainerregistrynortheurope.azurecr.io/animatorstudio:${{ github.sha }}
+          _buildArgumentsKey_: |
+            _buildArgumentsValues_
+
+
