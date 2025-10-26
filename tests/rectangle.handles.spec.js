@@ -14,7 +14,6 @@ test.describe('Rectangle handles', () => {
     await loadApp(page);
     await setTool(page, 'rectangle');
     await drawRectangle(page, {});
-    await setTool(page, 'select');
     await ensureSelectionCount(page, 1);
 
     const beforeBounds = await getShapeBounds(page);

@@ -12,7 +12,10 @@
   --timeline-bg: #0f172a;
   --timeline-track: rgba(148, 163, 184, 0.45);
   --timeline-marker: #facc15;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-font-size: 0.95rem;
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
 }
 
 * {
@@ -26,6 +29,8 @@ textarea,
 summary,
 details {
   font-family: inherit;
+  font-size: var(--ui-font-size);
+  line-height: 1.2;
 }
 
 [hidden] {
@@ -37,6 +42,8 @@ body {
   background: radial-gradient(circle at top left, #111827, #0f172a 45%, #020617 100%);
   color: var(--text-light);
   min-height: 100vh;
+  font-family: var(--ui-font-family);
+  font-size: var(--ui-font-size);
 }
 
 .app-shell {
@@ -44,7 +51,6 @@ body {
   flex-direction: column;
   min-height: 100vh;
 }
-
 
 .app-header {
   display: flex;
@@ -838,7 +844,7 @@ button.danger:disabled {
 .timeline-track {
   position: relative;
   width: 100%;
-  height: 80px;
+  height: 40px;
   background: rgba(148, 163, 184, 0.1);
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 0.75rem;
@@ -874,8 +880,8 @@ button.danger:disabled {
 
 .timeline-key {
   position: absolute;
-  top: 12px;
-  bottom: 12px;
+  top: 8px;
+  bottom: 8px;
   width: 4px;
   border-radius: 999px;
   background: rgba(99, 102, 241, 0.65);

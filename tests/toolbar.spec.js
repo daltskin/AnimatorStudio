@@ -4,6 +4,7 @@ const {
   dispatchPointerEvent,
   pointerDrag,
   getCanvasRect,
+  getCanvasCenter,
   setTimelineTime,
   setTool,
   drawRectangle,
@@ -52,6 +53,53 @@ test.describe('Toolbar interactions', () => {
     }
   });
 
+  test('pen tool expands stroke width range', async ({ page }) => {
+    await loadApp(page);
+
+    const slider = page.locator('#strokeWidth');
+
+    await expect(slider).toHaveAttribute('min', '1');
+    await expect(slider).toHaveAttribute('max', '12');
+
+    await setTool(page, 'free');
+
+    await expect(slider).toHaveAttribute('min', '1');
+    await expect(slider).toHaveAttribute('max', '24');
+
+    await setTool(page, 'rectangle');
+
+    await expect(slider).toHaveAttribute('min', '1');
+    await expect(slider).toHaveAttribute('max', '12');
+  });
+
+  test('free draw retains 24px stroke after deselection', async ({ page }) => {
+    await loadApp(page);
+
+    await setTool(page, 'free');
+
+    const slider = page.locator('#strokeWidth');
+    await slider.evaluate((input) => {
+      input.value = '24';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    const center = await getCanvasCenter(page);
+    await pointerDrag(page, center.x - 80, center.y, center.x + 80, center.y + 20, { steps: 12 });
+
+    await ensureShapeCount(page, 1);
+
+    await setTool(page, 'select');
+
+    const canvasRect = await getCanvasRect(page);
+    const offX = canvasRect.x + canvasRect.width - 10;
+    const offY = canvasRect.y + canvasRect.height - 10;
+    await dispatchPointerEvent(page, 'pointerdown', offX, offY);
+    await dispatchPointerEvent(page, 'pointerup', offX, offY);
+
+    await expect.poll(() => page.evaluate(() => window.animatorState.selectedIds.size)).toBe(0);
+    await expect.poll(() => page.evaluate(() => window.animatorState.shapes[0]?.style.strokeWidth)).toBe(24);
+  });
+
   test('drawing after selecting rectangle enables keyframe button', async ({ page }) => {
     await loadApp(page);
 
@@ -62,6 +110,24 @@ test.describe('Toolbar interactions', () => {
 
     const addKeyframeButton = page.locator('#addKeyframe');
     await expect(addKeyframeButton).toBeEnabled();
+  });
+
+  test('newly drawn shape switches to select tool automatically', async ({ page }) => {
+    await loadApp(page);
+
+    await setTool(page, 'rectangle');
+    await drawRectangle(page);
+
+    await ensureShapeCount(page, 1);
+
+    await expect.poll(() => page.evaluate(() => window.animatorState.tool)).toBe('select');
+
+    const selectButton = page.locator('[data-tool="select"]');
+    await expect(selectButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(selectButton).toHaveClass(/selected/);
+
+    const rectangleButton = page.locator('[data-tool="rectangle"]');
+    await expect(rectangleButton).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('freshly drawn rectangles stay selected and can rotate and resize immediately', async ({ page }) => {
@@ -106,6 +172,21 @@ test.describe('Toolbar interactions', () => {
     await expect.poll(async () => (await getShapeBounds(page, initialSnapshot.id)).height).toBeGreaterThan(
       beforeBounds.height,
     );
+  });
+
+  test('delete key removes the active selection', async ({ page }) => {
+    await loadApp(page);
+
+    await setTool(page, 'rectangle');
+    await drawRectangle(page);
+
+    await ensureShapeCount(page, 1);
+    await ensureSelectionCount(page, 1);
+
+    await page.keyboard.press('Delete');
+
+    await expect.poll(() => page.evaluate(() => window.animatorState.shapes.length)).toBe(0);
+    await expect.poll(() => page.evaluate(() => window.animatorState.selectedIds.size)).toBe(0);
   });
 
   test('select tool marquee selects multiple shapes', async ({ page }) => {
@@ -407,18 +488,39 @@ test.describe('Toolbar interactions', () => {
 
     const initialWidth = await page.evaluate(() => Math.round(window.animatorState.stage.width));
 
-    const handle = page.locator('#stageResizeHandle');
-    const box = await handle.boundingBox();
-    expect(box).not.toBeNull();
-    if (!box) throw new Error('Stage resize handle not found');
-
-    const startX = box.x + box.width / 2;
-    const startY = box.y + box.height / 2;
-
-    await page.mouse.move(startX, startY);
-    await page.mouse.down();
-    await page.mouse.move(startX + 140, startY + 110, { steps: 10 });
-    await page.mouse.up();
+    await page.evaluate(({ pointerId, steps, deltaX, deltaY }) => {
+      const handleEl = document.getElementById('stageResizeHandle');
+      if (!handleEl) {
+        throw new Error('Stage resize handle not found');
+      }
+      const rect = handleEl.getBoundingClientRect();
+      const startX = rect.left + rect.width / 2;
+      const startY = rect.top + rect.height / 2;
+      const dispatch = (type, buttons, x, y) => {
+        const event = new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId,
+          pointerType: 'mouse',
+          buttons,
+          clientX: x,
+          clientY: y,
+        });
+        if (type === 'pointerdown') {
+          handleEl.dispatchEvent(event);
+        } else {
+          window.dispatchEvent(event);
+        }
+      };
+      dispatch('pointerdown', 1, startX, startY);
+      for (let step = 1; step <= steps; step += 1) {
+        const progress = step / steps;
+        const x = startX + deltaX * progress;
+        const y = startY + deltaY * progress;
+        dispatch('pointermove', 1, x, y);
+      }
+      dispatch('pointerup', 0, startX + deltaX, startY + deltaY);
+    }, { pointerId: 21, steps: 10, deltaX: 140, deltaY: 110 });
 
     await expect.poll(async () =>
       page.evaluate(() => Math.round(window.animatorState.stage.width)),

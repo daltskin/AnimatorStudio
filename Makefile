@@ -10,7 +10,9 @@ ROOT_DIR := $(CURDIR)
 
 .DEFAULT_GOAL := help
 
-.PHONY: help install browsers test test-ui test-debug serve clean-reports
+.PHONY: all help install browsers test test-ui test-debug run clean-reports
+
+all: help
 
 help: ## Show available commands
 	@printf "Animator Studio helpers:\n"
@@ -20,7 +22,7 @@ help: ## Show available commands
 	@printf "  %-18s %s\n" "make test" "Run the headless regression suite"
 	@printf "  %-18s %s\n" "make test-ui" "Open the Playwright UI runner"
 	@printf "  %-18s %s\n" "make test-debug" "Launch Playwright in debug mode"
-	@printf "  %-18s %s\n" "make serve" "Start a static dev server on localhost:8080"
+	@printf "  %-18s %s\n" "make run" "Start a static dev server on localhost:4173"
 	@printf "  %-18s %s\n" "make clean-reports" "Remove Playwright reports and artifacts"
 
 install: ## Install npm dependencies
@@ -42,8 +44,8 @@ test-debug: browsers ## Launch Playwright in debug mode
 	$(NPM) run test:debug
 
 # Serve the app locally via http-server (Ctrl+C to stop).
-serve: ## Start a static dev server on http://localhost:8080
-	$(HTTP_SERVER) $(ROOT_DIR) -c-1
+run: ## Start a static dev server on http://localhost:4173
+	$(HTTP_SERVER) $(ROOT_DIR) -c-1 -p 4173
 
 # Remove generated reports from previous runs.
 clean-reports: ## Remove Playwright reports and artifacts

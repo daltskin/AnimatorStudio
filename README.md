@@ -6,7 +6,10 @@ Animator Studio is a lightweight web app for building presentation-friendly moti
 
 - **Rich shape library:** Rectangle, square, circle, arrow, straight line, and free-draw pen.
 - **Direct manipulation:** Click to place shapes, drag to reposition, and pull the golden handle to resize (with live aspect locking for squares and radius control for circles).
+- **Instant selection:** Newly drawn shapes auto-select so you can tweak styling or keyframes without swapping tools.
+- **Precision stacking:** Only the active selection responds to move, resize, and rotate handles, preventing stray edits to shapes tucked above or below.
 - **Smart styling controls:** Update fill, stroke, stroke width, and sketchiness on the fly; selections keep the sidebar controls in sync.
+- **Expanded typography:** Pick from a broader mix of handwriting, freestyle, display, and serif fonts—no more grouped options.
 - **Animated connectors:** Arrow and Line tools stay editable, exposing bend + arrowhead toggles for fast callouts.
 - **Stage colour control:** Right-click the canvas to open the stage context menu, pick a background colour, or reset to the default—settings persist between sessions and export with the scene.
 - **Grouping that sticks:** Combine shapes, move them as a unit, and ungroup when you need to iterate; marquee selection respects grouped clusters.
@@ -82,6 +85,17 @@ This makes it easy to archive work, hand off to teammates, or build a future imp
 
 To capture animated GIFs, switch to the desired timeline range, click **Export GIF**, and follow the prompts. The GIF encoder samples the current stage background colour and respects loop/bounce settings.
 
+## 🎨 Sample Scenes
+
+Reusable demos live under `samples/` so you can import them from the toolbar’s scene picker:
+
+- `samples/record-player.json` — spinning vinyl, animated tonearm, and glowing highlight.
+- `samples/emoji-emotions.json` — emoji face cycling through quick mood swaps.
+- `samples/bouncing-ball-loop.json` — side-to-side bounce with squash-and-stretch.
+- `samples/typing-text-reveal.json` — typewriter-style reveal with a blinking caret.
+- `samples/car-assembly.json` — chassis, roof, and wheels easing into place.
+- `samples/emoji-routing.json` — three emoji vehicles moving along diverging routes.
+
 ## ✅ Testing
 
 The project ships with Playwright end-to-end specs that cover the canvas, timeline, context menus, and export flows.
@@ -93,5 +107,12 @@ npm test
 ```
 
 > Tip: `npx playwright test --ui` launches the interactive runner if you prefer exploratory debugging.
+
+# Future roadmap
+
+- Add more samples, using layered shapes to create depth in the scene including:
+  - Running man through a park with trees and benches in the background on a sunny day
+  - Moving cars (different types) along a motorway becoming stuck in a traffic jam
+  - A festive winter scene with snow falling
 
 Enjoy crafting motion stories! If you spot a bug or have a feature suggestion, feel free to open an issue or send a PR.

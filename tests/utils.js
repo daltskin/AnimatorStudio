@@ -96,6 +96,77 @@ async function mouseDrag(page, startX, startY, endX, endY, { steps = 12 } = {}) 
   await dispatchMouseEvent(page, 'mouseup', endX, endY);
 }
 
+async function touchDrag(page, startX, startY, endX, endY, { steps = 12, selector = '#stage' } = {}) {
+  await page.evaluate(({ startX: sx, startY: sy, endX: ex, endY: ey, steps: totalSteps, selector: targetSelector }) => {
+    const target = document.querySelector(targetSelector);
+    if (!target) throw new Error(`Touch target not found for selector ${targetSelector}`);
+
+    const createTouch = (x, y, identifier) => ({
+      identifier,
+      clientX: x,
+      clientY: y,
+      pageX: x,
+      pageY: y,
+      screenX: x,
+      screenY: y,
+      target,
+    });
+
+    const toTouchList = (items) => {
+      const list = {
+        length: items.length,
+        item(index) {
+          return items[index] || null;
+        },
+      };
+      items.forEach((item, index) => {
+        list[index] = item;
+      });
+      return list;
+    };
+
+    const dispatch = (type, touchesArray, changedArray) => {
+      const event = new Event(type, { bubbles: true, cancelable: true });
+      const touchesList = toTouchList(touchesArray);
+      const changedList = toTouchList(changedArray);
+      const targetTouches = type === 'touchend' || type === 'touchcancel' ? [] : touchesArray;
+      Object.defineProperty(event, 'touches', {
+        configurable: true,
+        enumerable: true,
+        value: type === 'touchend' ? toTouchList([]) : touchesList,
+      });
+      Object.defineProperty(event, 'changedTouches', {
+        configurable: true,
+        enumerable: true,
+        value: changedList,
+      });
+      Object.defineProperty(event, 'targetTouches', {
+        configurable: true,
+        enumerable: true,
+        value: type === 'touchend' ? toTouchList([]) : toTouchList(targetTouches),
+      });
+      Object.defineProperty(event, 'shiftKey', { configurable: true, enumerable: true, value: false });
+      Object.defineProperty(event, 'ctrlKey', { configurable: true, enumerable: true, value: false });
+      Object.defineProperty(event, 'metaKey', { configurable: true, enumerable: true, value: false });
+      Object.defineProperty(event, 'altKey', { configurable: true, enumerable: true, value: false });
+      target.dispatchEvent(event);
+    };
+
+    const identifier = Date.now() % 100000;
+    let activeTouch = createTouch(sx, sy, identifier);
+    dispatch('touchstart', [activeTouch], [activeTouch]);
+    for (let step = 1; step <= totalSteps; step += 1) {
+      const progress = step / totalSteps;
+      const x = sx + (ex - sx) * progress;
+      const y = sy + (ey - sy) * progress;
+      activeTouch = createTouch(x, y, identifier);
+      dispatch('touchmove', [activeTouch], [activeTouch]);
+    }
+    const endTouch = createTouch(ex, ey, identifier);
+    dispatch('touchend', [], [endTouch]);
+  }, { startX, startY, endX, endY, steps, selector });
+}
+
 async function getCanvasRect(page) {
   return page.evaluate(() => {
     const canvas = document.getElementById('stage');
@@ -137,6 +208,10 @@ async function setTool(page, tool) {
 }
 
 async function drawRectangle(page, { offsetX = 0, offsetY = 0, width = 120, height = 80 } = {}) {
+  const currentTool = await page.evaluate(() => window.animatorState?.tool ?? 'select');
+  if (currentTool !== 'rectangle') {
+    await setTool(page, 'rectangle');
+  }
   const rect = await getCanvasRect(page);
   const startX = rect.x + rect.width / 2 - width / 2 + offsetX;
   const startY = rect.y + rect.height / 2 - height / 2 + offsetY;
@@ -222,6 +297,22 @@ async function getShapeBounds(page, shapeId = null) {
     const target = id === null ? undefined : id;
     return api.getShapeBounds(target) ?? null;
   }, shapeId ?? null);
+}
+
+async function getSelectionClientCenter(page) {
+  return page.evaluate(() => {
+    const canvas = document.getElementById('stage');
+    if (!canvas) return null;
+    const selection = window.animatorState?.selection;
+    if (!selection) return null;
+    const bounds = window.animatorApi?.getShapeBounds(selection.id);
+    if (!bounds) return null;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: rect.left + bounds.x + bounds.width / 2,
+      y: rect.top + bounds.y + bounds.height / 2,
+    };
+  });
 }
 
 async function resizeShapeFromHandle(page, { shapeId = null, deltaX = 80, deltaY = 80, steps = 8 } = {}) {
@@ -370,6 +461,7 @@ module.exports = {
   dispatchMouseEvent,
   pointerDrag,
   mouseDrag,
+  touchDrag,
   getCanvasRect,
   getCanvasCenter,
   setTimelineTime,
@@ -382,6 +474,7 @@ module.exports = {
   getSelectedShapeSnapshot,
   getShapeSnapshot,
   getShapeBounds,
+  getSelectionClientCenter,
   resizeShapeFromHandle,
   getConnectorBendHandlePoint,
   bendConnectorFromHandle,

@@ -13,21 +13,21 @@ const elements = {
   strokeWidth: document.getElementById("strokeWidth"),
   strokeWidthValue: document.getElementById("strokeWidthValue"),
   sketchButtons: Array.from(document.querySelectorAll("[data-sketch-level]")),
-  selectionLabel: document.getElementById("selectionLabel"),
-  deleteShape: document.getElementById("deleteShape"),
-  arrowEndingControl: document.getElementById("arrowEndingControl"),
+  fontFamily: document.getElementById("fontFamily"),
   arrowToggleButtons: Array.from(document.querySelectorAll("[data-arrow-toggle]")),
+  arrowEndingControl: document.getElementById("arrowEndingControl"),
+  marqueeOverlay: document.getElementById("marqueeOverlay"),
+  selectionLabel: document.getElementById("selectionLabel"),
+  keyframeList: document.getElementById("keyframeList"),
+  timelineTrack: document.getElementById("timelineTrack"),
+  timelineMarker: document.getElementById("timelineMarker"),
   timelineRange: document.getElementById("timelineRange"),
-  currentTime: document.getElementById("currentTime"),
   timelineDuration: document.getElementById("timelineDuration"),
+  currentTime: document.getElementById("currentTime"),
   playToggle: document.getElementById("playToggle"),
   stopPlayback: document.getElementById("stopPlayback"),
   addKeyframe: document.getElementById("addKeyframe"),
-  keyframeList: document.getElementById("keyframeList"),
-  timelineTrack: document.getElementById("timelineTrack"),
-  timelineMarker: document.querySelector(".timeline-marker"),
   loopToggle: document.getElementById("loopToggle"),
-  loopToggleLabel: document.getElementById("loopToggleLabel"),
   bounceToggle: document.getElementById("bounceToggle"),
   bounceToggleLabel: document.getElementById("bounceToggleLabel"),
   exportFps: document.getElementById("exportFps"),
@@ -38,25 +38,26 @@ const elements = {
   clearCanvas: document.getElementById("clearCanvas"),
   importScene: document.getElementById("importScene"),
   importSceneInput: document.getElementById("importSceneInput"),
-  fontFamily: document.getElementById("fontFamily"),
   groupShapes: document.getElementById("groupShapes"),
   ungroupShapes: document.getElementById("ungroupShapes"),
+  deleteShape: document.getElementById("deleteShape"),
+  stageBackgroundColor: document.getElementById("stageBackgroundColor"),
+  shapeContextMenu: document.getElementById("shapeContextMenu"),
+  stageContextMenu: document.getElementById("stageContextMenu"),
+  tipsPanel: document.querySelector("[data-tips]"),
+  tipsList: document.getElementById("tipsList"),
   canvasWrapper: document.querySelector(".canvas-wrapper"),
   stageSurface: document.querySelector(".stage-surface"),
   stageDimensions: document.getElementById("stageDimensions"),
   stageResizeHandle: document.getElementById("stageResizeHandle"),
   stageResizeHandles: Array.from(document.querySelectorAll("[data-stage-resize]")),
-  tipsPanel: document.querySelector("[data-tips]"),
-  tipsList: document.getElementById("tipsList"),
-  marqueeOverlay: document.getElementById("marqueeOverlay"),
-  shapeContextMenu: document.getElementById("shapeContextMenu"),
-  stageContextMenu: document.getElementById("stageContextMenu"),
-  stageBackgroundColor: document.getElementById("stageBackgroundColor"),
 };
 
 const DEFAULT_STAGE_BACKGROUND =
   getComputedStyle(document.documentElement).getPropertyValue("--canvas-bg")?.trim() || "#ffffff";
 const STAGE_BACKGROUND_STORAGE_KEY = "animator.stage.background";
+const STROKE_WIDTH_DEFAULT_RANGE = { min: 1, max: 12 };
+const STROKE_WIDTH_PEN_RANGE = { min: 1, max: 24 };
 
 const findArrowToggleButton = (key) =>
   elements.arrowToggleButtons.find((button) => button.getAttribute("data-arrow-toggle") === key) || null;
@@ -84,10 +85,43 @@ const TIPS_CONTENT = [
   { id: "timeline", text: "Use the timeline to set keyframes for smooth animations." },
   { id: "arrow-tool", text: "Arrow tool can draw connectors with customizable endings." },
 ];
+
+const FONT_FALLBACKS = {
+  Inter: "sans-serif",
+  Poppins: "sans-serif",
+  Roboto: "sans-serif",
+  Montserrat: "sans-serif",
+  "Source Sans Pro": "sans-serif",
+  "Work Sans": "sans-serif",
+  Nunito: "sans-serif",
+  Raleway: "sans-serif",
+  Merriweather: "serif",
+  Lora: "serif",
+  "Playfair Display": "serif",
+  "DM Serif Display": "serif",
+  "IBM Plex Mono": "monospace",
+  "Courier Prime": "monospace",
+  "Fira Code": "monospace",
+  Caveat: "cursive",
+  "Shadows Into Light": "cursive",
+  "Permanent Marker": "cursive",
+  Pacifico: "cursive",
+  "Amatic SC": "cursive",
+  Lobster: "cursive",
+};
+
+function getFontStack(fontFamily) {
+  const family = fontFamily || "Inter";
+  const fallback = FONT_FALLBACKS[family] || "sans-serif";
+  const sanitized = family.replace(/"/g, '\\"');
+  return `"${sanitized}", ${fallback}`;
+}
+
 const STAGE_SIZE_STORAGE_KEY = "animator.stage.size";
 let dismissedTips = new Set();
 
 const TIMELINE_DEFAULT_DURATION = 5;
+const HISTORY_LIMIT = 100;
 
 const state = {
   tool: "select",
@@ -113,6 +147,8 @@ const state = {
   stage: {
     width: canvas.width,
     height: canvas.height,
+    displayWidth: canvas.width,
+    displayHeight: canvas.height,
     minWidth: 320,
     minHeight: 240,
     maxWidth: 4096,
@@ -120,6 +156,7 @@ const state = {
     autoFit: true,
     resizeSession: null,
     background: DEFAULT_STAGE_BACKGROUND,
+    canvasRect: null,
   },
   timeline: {
     duration: Number(elements.timelineDuration.value) || TIMELINE_DEFAULT_DURATION,
@@ -130,7 +167,6 @@ const state = {
     bounce: false,
     direction: 1,
     exportFps: elements.exportFps ? Number(elements.exportFps.value) || 12 : 12,
-    selectedKeyframeTime: null,
   },
   pointer: {
     down: false,
@@ -145,11 +181,17 @@ const state = {
     startBounds: null,
     activeHandle: null,
     startHandleVector: null,
+    startStyle: null,
+    multiSnapshot: null,
     marquee: null,
     marqueeAppend: false,
     usingPointerEvents: false,
-    startStyle: null,
-    multiSnapshot: null,
+    touchIdentifier: null,
+  },
+  history: {
+    undoStack: [],
+    limit: HISTORY_LIMIT,
+    pending: null,
   },
   clipboard: {
     items: [],
@@ -158,10 +200,272 @@ const state = {
   activeTextEditor: null,
   groups: {},
   activeGroupId: null,
+  activeGroup: null,
 };
 
 let shapeIdCounter = 1;
 let groupIdCounter = 1;
+
+function syncActiveGroupState() {
+  const groupId = state.activeGroupId;
+  if (!groupId) {
+    state.activeGroup = null;
+    return;
+  }
+  const members = state.groups[groupId];
+  if (!(members instanceof Set) || members.size < 2) {
+    state.activeGroup = null;
+    state.activeGroupId = null;
+    return;
+  }
+  state.activeGroup = {
+    id: groupId,
+    ids: new Set(members),
+  };
+}
+
+function setActiveGroupId(nextGroupId) {
+  state.activeGroupId = nextGroupId ?? null;
+  syncActiveGroupState();
+}
+
+function cloneShapeForHistory(shape) {
+  if (!shape) return null;
+  const clone = {
+    id: shape.id,
+    type: shape.type,
+    style: JSON.parse(JSON.stringify(shape.style || {})),
+    live: JSON.parse(JSON.stringify(shape.live || {})),
+    keyframes: Array.isArray(shape.keyframes)
+      ? shape.keyframes.map((keyframe) => ({
+          time: keyframe.time,
+          snapshot: keyframe.snapshot ? JSON.parse(JSON.stringify(keyframe.snapshot)) : null,
+        }))
+      : [],
+    birthTime: shape.birthTime ?? 0,
+    isVisible: shape.isVisible !== false,
+  };
+
+  if (shape.groupId) {
+    clone.groupId = shape.groupId;
+  }
+
+  if (shape.asset) {
+    clone.asset = { ...shape.asset };
+    if (clone.asset.image) {
+      delete clone.asset.image;
+    }
+  }
+
+  return clone;
+}
+
+function reviveShapeFromHistory(data) {
+  if (!data) return null;
+  const shape = {
+    id: data.id,
+    type: data.type,
+    style: JSON.parse(JSON.stringify(data.style || {})),
+    live: JSON.parse(JSON.stringify(data.live || {})),
+    keyframes: Array.isArray(data.keyframes)
+      ? data.keyframes.map((keyframe) => ({
+          time: keyframe.time,
+          snapshot: keyframe.snapshot ? JSON.parse(JSON.stringify(keyframe.snapshot)) : null,
+        }))
+      : [],
+    birthTime: data.birthTime ?? 0,
+    isVisible: data.isVisible !== false,
+  };
+
+  if (data.groupId) {
+    shape.groupId = data.groupId;
+  }
+
+  if (data.asset) {
+    shape.asset = { ...data.asset };
+    if (shape.asset.image) {
+      delete shape.asset.image;
+    }
+    if (shape.asset.source) {
+      rehydrateShapeAsset(shape);
+    }
+  }
+
+  normalizeShapeKeyframes(shape);
+  return shape;
+}
+
+function cloneStateSnapshot() {
+  const groups = {};
+  Object.entries(state.groups || {}).forEach(([groupId, members]) => {
+    groups[groupId] = Array.from(members);
+  });
+
+  return {
+    shapes: state.shapes.map((shape) => cloneShapeForHistory(shape)).filter(Boolean),
+    groups,
+    activeGroupId: state.activeGroupId ?? null,
+    selectedIds: Array.from(state.selectedIds || []),
+    selectionId: state.selection ? state.selection.id : null,
+    timeline: {
+      current: state.timeline.current,
+      duration: state.timeline.duration,
+      loop: state.timeline.loop,
+      bounce: state.timeline.bounce,
+      exportFps: state.timeline.exportFps,
+      selectedKeyframeTime: state.timeline.selectedKeyframeTime ?? null,
+    },
+    shapeIdCounter,
+    groupIdCounter,
+  };
+}
+
+function pushSnapshotToUndo(snapshot, reason = "change") {
+  if (!snapshot) return;
+  state.history.undoStack.push({ snapshot, reason });
+  if (state.history.undoStack.length > state.history.limit) {
+    state.history.undoStack.shift();
+  }
+}
+
+function prepareHistory(reason = "change") {
+  const snapshot = cloneStateSnapshot();
+  state.history.pending = {
+    snapshot,
+    reason,
+    applied: false,
+  };
+  return state.history.pending;
+}
+
+function markHistoryChanged() {
+  if (state.history.pending) {
+    state.history.pending.applied = true;
+  }
+}
+
+function finalizeHistory({ discardIfUnchanged = true } = {}) {
+  const pending = state.history.pending;
+  if (!pending) return;
+  if (!pending.applied && discardIfUnchanged) {
+    state.history.pending = null;
+    return;
+  }
+  pushSnapshotToUndo(pending.snapshot, pending.reason);
+  state.history.pending = null;
+}
+
+function pushHistorySnapshot(reason = "change") {
+  state.history.pending = null;
+  pushSnapshotToUndo(cloneStateSnapshot(), reason);
+}
+
+function createHistoryEntry(reason = "change") {
+  return {
+    snapshot: cloneStateSnapshot(),
+    reason,
+  };
+}
+
+function commitHistoryEntry(entry) {
+  if (!entry || !entry.snapshot) return;
+  pushSnapshotToUndo(entry.snapshot, entry.reason);
+}
+
+function restoreHistorySnapshot(snapshot) {
+  if (!snapshot) return false;
+
+  state.history.pending = null;
+  stopPlayback();
+  destroyActiveTextEditorElement();
+
+  const shapes = Array.isArray(snapshot.shapes)
+    ? snapshot.shapes.map((shape) => reviveShapeFromHistory(shape)).filter(Boolean)
+    : [];
+  state.shapes = shapes;
+
+  const groups = {};
+  Object.entries(snapshot.groups || {}).forEach(([groupId, members]) => {
+    groups[groupId] = new Set(Array.isArray(members) ? members : []);
+  });
+  state.groups = groups;
+  setActiveGroupId(snapshot.activeGroupId ?? null);
+
+  const timeline = snapshot.timeline || {};
+  if (Number.isFinite(timeline.duration)) {
+    state.timeline.duration = Math.max(0, timeline.duration);
+    if (elements.timelineDuration) {
+      elements.timelineDuration.value = String(state.timeline.duration);
+    }
+  }
+  if (typeof timeline.loop === "boolean") {
+    state.timeline.loop = timeline.loop;
+  }
+  if (typeof timeline.bounce === "boolean") {
+    state.timeline.bounce = timeline.bounce;
+  }
+  if (Number.isFinite(timeline.exportFps)) {
+    state.timeline.exportFps = timeline.exportFps;
+    if (elements.exportFps) {
+      elements.exportFps.value = String(Math.round(state.timeline.exportFps));
+    }
+  }
+  state.timeline.selectedKeyframeTime = Number.isFinite(timeline.selectedKeyframeTime)
+    ? timeline.selectedKeyframeTime
+    : null;
+  state.timeline.lastTick = null;
+  state.timeline.isPlaying = false;
+  state.timeline.direction = 1;
+
+  const currentTime = Number.isFinite(timeline.current) ? timeline.current : state.timeline.current;
+  setTimelineTime(Math.max(0, currentTime), { apply: true });
+
+  const selectedIds = Array.isArray(snapshot.selectedIds) ? snapshot.selectedIds : [];
+  const selectedShapes = selectedIds
+    .map((id) => state.shapes.find((shape) => shape.id === id))
+    .filter(Boolean);
+
+  if (selectedShapes.length > 0) {
+    setSelectedShapes(selectedShapes, { primaryId: snapshot.selectionId || undefined });
+  } else {
+    setSelectedShapes([]);
+  }
+
+  state.shapes.forEach((shape) => {
+    if (shape && shape.type === "text") {
+      updateTextMetrics(shape, { keepCenter: true });
+    }
+  });
+
+  applyTimelineState();
+  renderTimelineTrackMarkers();
+
+  const maxShapeId = state.shapes.reduce((max, shape) => Math.max(max, Number(shape.id) || 0), 0);
+  const nextShapeId = Math.max(maxShapeId + 1, snapshot.shapeIdCounter ?? 1);
+  shapeIdCounter = Number.isFinite(nextShapeId) ? nextShapeId : maxShapeId + 1;
+
+  const groupIds = Object.keys(state.groups || {});
+  const maxGroupNumeric = groupIds.reduce((max, id) => {
+    const numeric = getGroupNumericSuffix(id);
+    return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
+  }, 0);
+  const nextGroupId = Math.max(maxGroupNumeric + 1, snapshot.groupIdCounter ?? 1);
+  groupIdCounter = Number.isFinite(nextGroupId) ? nextGroupId : maxGroupNumeric + 1;
+
+  return true;
+}
+
+function undoLastAction() {
+  if (!state.history || !Array.isArray(state.history.undoStack)) return false;
+  if (state.history.undoStack.length === 0) return false;
+
+  const entry = state.history.undoStack.pop();
+  if (!entry || !entry.snapshot) {
+    return false;
+  }
+
+  return restoreHistorySnapshot(entry.snapshot);
+}
 
 const TEXT_PADDING = 16;
 const KEYFRAME_EPSILON = 0.001;
@@ -181,30 +485,99 @@ function init() {
   render();
 }
 
+function computeAutoFitSize() {
+  const wrapper = elements.canvasWrapper ? elements.canvasWrapper.getBoundingClientRect() : null;
+  const fallback = canvas.getBoundingClientRect();
+  const baseWidth = Number.isFinite(state.stage.width) && state.stage.width > 0 ? state.stage.width : fallback.width || canvas.width;
+  const baseHeight = Number.isFinite(state.stage.height) && state.stage.height > 0 ? state.stage.height : fallback.height || canvas.height;
+  const aspect = baseWidth > 0 && baseHeight > 0 ? baseWidth / baseHeight : 16 / 9;
+  const margin = 20; // 10px margin on each side
+
+  const availableWidth = wrapper ? Math.max(state.stage.minWidth, wrapper.width - margin) : fallback.width || baseWidth;
+  const availableHeight = wrapper ? Math.max(state.stage.minHeight, wrapper.height - margin) : fallback.height || baseHeight;
+
+  let targetWidth = availableWidth;
+  let targetHeight = targetWidth / aspect;
+
+  if (targetHeight > availableHeight) {
+    targetHeight = availableHeight;
+    targetWidth = targetHeight * aspect;
+  }
+
+  targetWidth = Math.max(state.stage.minWidth, Math.min(state.stage.maxWidth, targetWidth));
+  targetHeight = Math.max(state.stage.minHeight, Math.min(state.stage.maxHeight, targetHeight));
+
+  return {
+    width: targetWidth,
+    height: targetHeight,
+  };
+}
+
+function updateCanvasMetrics() {
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  state.stage.canvasRect = {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+  };
+  state.stage.displayWidth = rect.width;
+  state.stage.displayHeight = rect.height;
+}
+
 function resizeCanvas() {
   const ratio = window.devicePixelRatio || 1;
-  let targetWidth = state.stage.autoFit ? canvas.getBoundingClientRect().width : state.stage.width;
-  let targetHeight = state.stage.autoFit ? canvas.getBoundingClientRect().height : state.stage.height;
+  let targetWidth;
+  let targetHeight;
+
+  if (state.stage.autoFit) {
+    const autoFit = computeAutoFitSize();
+    targetWidth = autoFit.width;
+    targetHeight = autoFit.height;
+  } else {
+    targetWidth = state.stage.width;
+    targetHeight = state.stage.height;
+  }
 
   if (!Number.isFinite(targetWidth) || targetWidth <= 0 || !Number.isFinite(targetHeight) || targetHeight <= 0) {
     const rect = canvas.getBoundingClientRect();
-    targetWidth = rect.width;
-    targetHeight = rect.height;
+    targetWidth = rect.width || canvas.width;
+    targetHeight = rect.height || canvas.height;
   }
 
   canvas.style.width = `${targetWidth}px`;
   canvas.style.height = `${targetHeight}px`;
-  canvas.width = Math.round(targetWidth * ratio);
-  canvas.height = Math.round(targetHeight * ratio);
+  canvas.width = Math.max(1, Math.round(targetWidth * ratio));
+  canvas.height = Math.max(1, Math.round(targetHeight * ratio));
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-  state.stage.width = targetWidth;
-  state.stage.height = targetHeight;
+
+  updateCanvasMetrics();
+
+  const displayWidth = state.stage.canvasRect?.width || targetWidth;
+  const displayHeight = state.stage.canvasRect?.height || targetHeight;
+
+  if (state.stage.autoFit) {
+    state.stage.width = displayWidth;
+    state.stage.height = displayHeight;
+  } else {
+    state.stage.width = targetWidth;
+    state.stage.height = targetHeight;
+  }
+
   updateStageDimensionsLabel();
   repositionActiveTextEditor();
 }
 
 function bindEvents() {
   window.addEventListener("resize", resizeCanvas);
+
+  if (canvas) {
+    canvas.style.touchAction = "none";
+  }
+  if (elements.stageSurface && elements.stageSurface.style) {
+    elements.stageSurface.style.touchAction = "none";
+  }
 
   elements.stageBackgroundColor?.addEventListener("input", (event) => {
     const value = event.target.value;
@@ -294,10 +667,12 @@ function bindEvents() {
     elements.stageResizeHandles.forEach((handle) => {
       handle.addEventListener("pointerdown", startStageResize);
       handle.addEventListener("mousedown", startStageResize);
+      handle.addEventListener("touchstart", startStageResize, { passive: false });
     });
   } else {
     elements.stageResizeHandle?.addEventListener("pointerdown", startStageResize);
     elements.stageResizeHandle?.addEventListener("mousedown", startStageResize);
+    elements.stageResizeHandle?.addEventListener("touchstart", startStageResize, { passive: false });
   }
   elements.tipsList?.addEventListener("click", handleTipsListClick);
   window.addEventListener("pointermove", handleStageResizeMove);
@@ -305,7 +680,14 @@ function bindEvents() {
   window.addEventListener("pointercancel", endStageResize);
   window.addEventListener("mousemove", handleStageResizeMove);
   window.addEventListener("mouseup", endStageResize);
+  window.addEventListener("touchmove", handleStageResizeMove, { passive: false });
+  window.addEventListener("touchend", endStageResize, { passive: false });
+  window.addEventListener("touchcancel", endStageResize, { passive: false });
 
+  canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
+  canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+  canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
+  canvas.addEventListener("touchcancel", handleTouchCancel, { passive: false });
   canvas.addEventListener("pointerdown", handlePointerDown);
   canvas.addEventListener("pointermove", handlePointerMove);
   canvas.addEventListener("pointerup", handlePointerUp);
@@ -356,7 +738,7 @@ function bindEvents() {
     }
 
     state.groups[groupId] = memberSet;
-    state.activeGroupId = groupId;
+    setActiveGroupId(groupId);
 
     const shapes = Array.from(memberSet)
       .map((id) => getShapeById(id))
@@ -380,7 +762,9 @@ function bindEvents() {
     });
     delete state.groups[groupId];
     if (state.activeGroupId === groupId) {
-      state.activeGroupId = null;
+      setActiveGroupId(null);
+    } else {
+      syncActiveGroupState();
     }
     pruneEmptyGroups();
     if (shapes.length > 0) {
@@ -493,12 +877,39 @@ function setTool(tool) {
   finalizeActiveTextEditor();
   closeAllContextMenus();
   state.tool = tool;
+  updateStrokeWidthControl(tool);
   elements.toolButtons.forEach((button) => {
     const isActive = button.dataset.tool === tool;
     button.classList.toggle("selected", isActive);
     button.setAttribute("aria-pressed", String(isActive));
   });
   syncArrowEndingUI();
+}
+
+function updateStrokeWidthControl(tool) {
+  const slider = elements.strokeWidth;
+  const display = elements.strokeWidthValue;
+  if (!slider || !display) return;
+  const range = tool === "free" ? STROKE_WIDTH_PEN_RANGE : STROKE_WIDTH_DEFAULT_RANGE;
+  slider.min = String(range.min);
+  slider.max = String(range.max);
+  const selectionWidth = Number.isFinite(state.selection?.style?.strokeWidth)
+    ? state.selection.style.strokeWidth
+    : null;
+  const baseWidth = Number.isFinite(state.style.strokeWidth) ? state.style.strokeWidth : range.min;
+  const clampedBaseWidth = Math.max(range.min, Math.min(range.max, baseWidth));
+
+  if (!Number.isFinite(state.style.strokeWidth) || state.style.strokeWidth !== clampedBaseWidth) {
+    state.style.strokeWidth = clampedBaseWidth;
+  }
+
+  const effectiveWidth = selectionWidth ?? state.style.strokeWidth;
+  const sliderValue = Math.max(range.min, Math.min(range.max, effectiveWidth));
+
+  if (Number(slider.value) !== sliderValue) {
+    slider.value = String(sliderValue);
+  }
+  display.textContent = `${effectiveWidth}px`;
 }
 
 function render() {
@@ -510,7 +921,7 @@ function render() {
   ctx.restore();
 
   ctx.save();
-  ctx.scale(ratio, ratio);
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
   drawShapes(ctx);
   drawSelectionBounds(ctx);
   ctx.restore();
@@ -614,8 +1025,8 @@ function drawImageShape(context, shape) {
     if (style.strokeWidth > 0) {
       context.stroke();
     }
-    context.fillStyle = "rgba(30, 41, 59, 0.6)";
-    context.font = "16px Inter, sans-serif";
+  context.fillStyle = "rgba(30, 41, 59, 0.6)";
+  context.font = `16px ${getFontStack("Inter")}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText("Image", 0, 0);
@@ -755,7 +1166,7 @@ function drawTextShape(context, shape) {
   context.translate(center.x, center.y);
   context.rotate(rotation);
   context.fillStyle = style.fill || "#111827";
-  context.font = `${fontSize}px ${fontFamily}, sans-serif`;
+  context.font = `${fontSize}px ${getFontStack(fontFamily)}`;
   context.textBaseline = "top";
   context.textAlign = "left";
 
@@ -787,7 +1198,11 @@ function drawArrowHead(context, start, end, size, style) {
 }
 
 function drawSelectionBounds(context) {
-  if (!state.selection || state.tool !== "select") return;
+  if (!state.selection) return;
+  const pointerMode = state.pointer?.mode;
+  if (pointerMode === "creating" || pointerMode === "drawing-free") {
+    return;
+  }
   const shape = state.selection;
   if (shape.isVisible === false) return;
 
@@ -928,10 +1343,10 @@ function handlePointerDown(event) {
     finalizeActiveTextEditor();
   }
 
-  let shape = hitTest(point);
   let handleTarget = null;
+  let shape = null;
 
-  if (!shape && state.selection) {
+  if (state.selection) {
     const selected = state.selection;
     const rotateHandle = detectRotateHandle(selected, point);
     const resizeHandle = detectResizeHandle(selected, point);
@@ -940,6 +1355,10 @@ function handlePointerDown(event) {
       shape = selected;
       handleTarget = rotateHandle || resizeHandle || lineHandle;
     }
+  }
+
+  if (!shape) {
+    shape = hitTest(point);
   }
 
   if (state.tool === "text" && !shape) {
@@ -973,9 +1392,21 @@ function handlePointerDown(event) {
       return;
     }
 
-    if (!alreadySelected || state.selectedIds.size <= 1) {
+    if (!alreadySelected) {
       updateSelection(shape);
-    } else {
+      resetPointerInteraction();
+      state.pointer.down = false;
+      if (typeof event.pointerId === "number" && typeof canvas.releasePointerCapture === "function") {
+        try {
+          canvas.releasePointerCapture(event.pointerId);
+        } catch (error) {
+          // Ignore release errors for fallback devices.
+        }
+      }
+      return;
+    }
+
+    if (state.selectedIds.size > 1 && state.selection?.id !== shape.id) {
       state.selection = shape;
       refreshSelectionUI();
     }
@@ -995,10 +1426,11 @@ function handlePointerDown(event) {
           state.pointer.multiSnapshot.set(id, cloneSnapshot(target.live));
         });
       }
+      prepareHistory("adjust-line-endpoint");
       return;
     }
 
-    const rotateHandle = handleTarget && handleTarget.type === "rotate" ? handleTarget : detectRotateHandle(shape, point);
+  const rotateHandle = handleTarget && handleTarget.type === "rotate" ? handleTarget : detectRotateHandle(shape, point);
     if (rotateHandle) {
       state.pointer.mode = "rotating";
       state.pointer.startSnapshot = cloneSnapshot(shape.live);
@@ -1007,6 +1439,7 @@ function handlePointerDown(event) {
       state.pointer.startRotation = getShapeRotation(shape);
       state.pointer.startBounds = rotateHandle.bounds;
       state.pointer.activeHandle = rotateHandle;
+      prepareHistory("rotate-shape");
       return;
     }
 
@@ -1019,6 +1452,7 @@ function handlePointerDown(event) {
       state.pointer.startBounds = resizeHandle.bounds;
       state.pointer.activeHandle = resizeHandle;
       state.pointer.startHandleVector = resizeHandle.localVector || null;
+      prepareHistory("resize-shape");
       return;
     }
 
@@ -1033,6 +1467,7 @@ function handlePointerDown(event) {
         state.pointer.multiSnapshot.set(id, cloneSnapshot(target.live));
       });
     }
+    prepareHistory("move-shapes");
     return;
   }
 
@@ -1050,6 +1485,7 @@ function handlePointerDown(event) {
   }
 
   state.pointer.mode = state.tool === "free" ? "drawing-free" : "creating";
+  prepareHistory(state.pointer.mode === "drawing-free" ? "draw-freeform" : "create-shape");
   const tempShape = createShape(state.tool, point, point);
   state.pointer.tempShape = tempShape;
   state.shapes.push(tempShape);
@@ -1111,6 +1547,7 @@ function handlePointerMove(event) {
   if (state.pointer.mode === "creating") {
     updateTempShape(point);
   } else if (state.pointer.mode === "drawing-free") {
+    markHistoryChanged();
     state.pointer.tempShape?.live.points.push(point);
   }
 }
@@ -1130,6 +1567,7 @@ function resetPointerInteraction() {
   state.pointer.marquee = null;
   state.pointer.marqueeAppend = false;
   state.pointer.usingPointerEvents = false;
+  state.pointer.touchIdentifier = null;
   hideMarqueeOverlay();
 }
 
@@ -1160,6 +1598,8 @@ function handlePointerUp(event) {
     return;
   }
 
+  let shouldFinalizeHistory = false;
+
   if (pointerMode === "marquee" && state.pointer.marquee) {
     finalizeMarqueeSelection();
   } else if (state.selection && [
@@ -1173,15 +1613,21 @@ function handlePointerUp(event) {
       state.pointer.multiSnapshot.forEach((_, id) => {
         const target = state.shapes.find((shape) => shape.id === id);
         if (!target) return;
-        writeKeyframe(target, state.timeline.current, { apply: false, render: false });
+        writeKeyframe(target, state.timeline.current, { apply: false, render: false, markSelected: false });
       });
       applyTimelineState();
       renderKeyframeList();
     } else {
       commitShapeChange(state.selection);
     }
+    shouldFinalizeHistory = true;
   } else if (pointerMode === "creating" || pointerMode === "drawing-free") {
     finalizeTempShape(point);
+    shouldFinalizeHistory = true;
+  }
+
+  if (shouldFinalizeHistory) {
+    finalizeHistory();
   }
 
   resetPointerInteraction();
@@ -1214,11 +1660,123 @@ function createSyntheticPointerEvent(event) {
     buttons: typeof event.buttons === "number" ? event.buttons : event.type === "mouseup" ? 0 : 1,
     preventDefault: () => event.preventDefault(),
     isSyntheticPointer: true,
+    pointerType: "mouse",
+    button: typeof event.button === "number" ? event.button : 0,
+    shiftKey: Boolean(event.shiftKey),
+    ctrlKey: Boolean(event.ctrlKey),
+    metaKey: Boolean(event.metaKey),
+    altKey: Boolean(event.altKey),
+    target: event.target,
   };
+}
+
+function getTouchById(touchList, identifier) {
+  if (!touchList) return null;
+  for (let index = 0; index < touchList.length; index += 1) {
+    const touch = touchList.item(index);
+    if (!touch) continue;
+    if (identifier === null || touch.identifier === identifier) {
+      return touch;
+    }
+  }
+  return null;
+}
+
+function createPointerEventFromTouch(event, touch, phase) {
+  const pointerId = (touch.identifier ?? 0) + 2;
+  return {
+    clientX: touch.clientX,
+    clientY: touch.clientY,
+    pointerId,
+    button: 0,
+    buttons: phase === "end" || phase === "cancel" ? 0 : 1,
+    shiftKey: Boolean(event.shiftKey),
+    ctrlKey: Boolean(event.ctrlKey),
+    metaKey: Boolean(event.metaKey),
+    altKey: Boolean(event.altKey),
+    preventDefault: () => event.preventDefault(),
+    stopPropagation: () => event.stopPropagation(),
+    target: event.target,
+    pointerType: "touch",
+    isSyntheticPointer: true,
+    touchIdentifier: touch.identifier,
+  };
+}
+
+function handleTouchStart(event) {
+  if (state.pointer.down) {
+    return;
+  }
+  const touch = getTouchById(event.changedTouches, null);
+  if (!touch) {
+    return;
+  }
+  event.preventDefault();
+  const pointerEvent = createPointerEventFromTouch(event, touch, "start");
+  handlePointerDown(pointerEvent);
+  if (state.pointer.down) {
+    state.pointer.usingPointerEvents = true;
+  }
+  if (state.pointer.down) {
+    state.pointer.touchIdentifier = touch.identifier;
+  } else {
+    state.pointer.touchIdentifier = null;
+  }
+}
+
+function handleTouchMove(event) {
+  if (!state.pointer.down) {
+    return;
+  }
+  const identifier = state.pointer.touchIdentifier;
+  if (identifier === null) {
+    return;
+  }
+  const touch = getTouchById(event.changedTouches, identifier);
+  if (!touch) {
+    return;
+  }
+  event.preventDefault();
+  const pointerEvent = createPointerEventFromTouch(event, touch, "move");
+  handlePointerMove(pointerEvent);
+}
+
+function handleTouchEnd(event) {
+  const identifier = state.pointer.touchIdentifier;
+  if (identifier === null) {
+    return;
+  }
+  const touch = getTouchById(event.changedTouches, identifier);
+  if (!touch) {
+    return;
+  }
+  event.preventDefault();
+  const pointerEvent = createPointerEventFromTouch(event, touch, "end");
+  handlePointerUp(pointerEvent);
+  state.pointer.touchIdentifier = null;
+  state.pointer.usingPointerEvents = false;
+}
+
+function handleTouchCancel(event) {
+  const identifier = state.pointer.touchIdentifier;
+  if (identifier === null) {
+    return;
+  }
+  const touch = getTouchById(event.changedTouches, identifier) || getTouchById(event.touches, identifier);
+  if (!touch) {
+    resetPointerInteraction();
+    return;
+  }
+  event.preventDefault();
+  const pointerEvent = createPointerEventFromTouch(event, touch, "cancel");
+  handlePointerUp(pointerEvent);
+  state.pointer.touchIdentifier = null;
+  state.pointer.usingPointerEvents = false;
 }
 
 function createTextShapeAt(point) {
   const origin = point || state.pointer.start || { x: state.stage.width / 2, y: state.stage.height / 2 };
+  const historyEntry = createHistoryEntry("create-text");
   const shape = createShape("text", origin, origin);
   if (!shape) return null;
   shape.style.fontFamily = shape.style.fontFamily || state.style.fontFamily || "Inter";
@@ -1229,6 +1787,7 @@ function createTextShapeAt(point) {
   updateSelection(shape);
   updateTextMetrics(shape, { centerOverride: origin });
   repositionActiveTextEditor();
+  commitHistoryEntry(historyEntry);
   return shape;
 }
 
@@ -1249,7 +1808,7 @@ function measureTextMetrics(text, style = {}) {
   const fontFamily = style.fontFamily || state.style.fontFamily || "Inter";
   const effectiveLines = lines.length > 0 ? lines : [""];
   ctx.save();
-  ctx.font = `${fontSize}px ${fontFamily}, sans-serif`;
+  ctx.font = `${fontSize}px ${getFontStack(fontFamily)}`;
   let maxWidth = 0;
   let ascent = fontSize * 0.8;
   let descent = fontSize * 0.2;
@@ -1358,7 +1917,7 @@ function finalizeActiveTextEditor({ cancel = false } = {}) {
   updateTextMetrics(shape, { keepCenter: true });
   if (!cancel) {
     ensureBaseKeyframe(shape, state.timeline.current);
-    writeKeyframe(shape, state.timeline.current);
+  writeKeyframe(shape, state.timeline.current, { markSelected: false });
   }
   repositionActiveTextEditor();
 }
@@ -1428,7 +1987,7 @@ function startTextEditing(shape, { focus = true, selectAll = false } = {}) {
     keepCenter,
   };
 
-  editor.style.fontFamily = `${shape.style.fontFamily || state.style.fontFamily || "Inter"}, sans-serif`;
+  editor.style.fontFamily = getFontStack(shape.style.fontFamily || state.style.fontFamily || "Inter");
   editor.style.fontSize = `${Math.max(6, shape.style.fontSize || state.style.fontSize || 32)}px`;
 
   if (keepCenter) {
@@ -1462,13 +2021,14 @@ function repositionActiveTextEditor() {
   active.element.style.top = `${top}px`;
   active.element.style.width = `${shape.live.width}px`;
   active.element.style.height = `${shape.live.height}px`;
-  active.element.style.fontFamily = `${shape.style.fontFamily || state.style.fontFamily || "Inter"}, sans-serif`;
+  active.element.style.fontFamily = getFontStack(shape.style.fontFamily || state.style.fontFamily || "Inter");
   active.element.style.fontSize = `${Math.max(6, shape.style.fontSize || state.style.fontSize || 32)}px`;
 }
 
 function moveShape(shape, point, startSnapshot = state.pointer.startSnapshot) {
   if (!shape) return;
   if (!startSnapshot) return;
+  markHistoryChanged();
   const dx = point.x - state.pointer.start.x;
   const dy = point.y - state.pointer.start.y;
 
@@ -1492,6 +2052,7 @@ function resizeShape(shape, point) {
   if (!shape) return;
   const start = state.pointer.startSnapshot;
   if (!start) return;
+  markHistoryChanged();
 
   if (shape.type === "text") {
     resizeTextShape(shape, point, start);
@@ -1580,6 +2141,7 @@ function resizeFreeformShape(shape, point, startSnapshot) {
 
 function resizeLineEndpoint(shape, point, mode) {
   if (!shape) return;
+  markHistoryChanged();
   if (mode === "resizing-line-start") {
     shape.live.start = { x: point.x, y: point.y };
   } else {
@@ -1591,6 +2153,7 @@ function rotateShape(shape, point) {
   if (!shape) return;
   const snapshot = state.pointer.startSnapshot;
   if (!snapshot) return;
+  markHistoryChanged();
   const center = state.pointer.startCenter || getShapeCenter(shape);
   const baseRotation = state.pointer.startRotation || 0;
   const startAngle = state.pointer.rotationStartAngle;
@@ -1598,12 +2161,12 @@ function rotateShape(shape, point) {
   const delta = currentAngle - startAngle;
 
   if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "text") {
-  shape.live.rotation = normalizeAngle(baseRotation + delta);
+    shape.live.rotation = normalizeAngle(baseRotation + delta);
     shape.live.width = snapshot.width;
     shape.live.height = snapshot.height;
     shape.live.x = center.x - snapshot.width / 2;
     shape.live.y = center.y - snapshot.height / 2;
-  shape.style.rotation = radiansToDegrees(shape.live.rotation);
+    shape.style.rotation = radiansToDegrees(shape.live.rotation);
   } else if (shape.type === "line" || shape.type === "arrow") {
     shape.live.start = rotatePoint(snapshot.start, center, delta);
     shape.live.end = rotatePoint(snapshot.end, center, delta);
@@ -1733,6 +2296,7 @@ function getRotationHandlePosition(shape) {
 function updateTempShape(point) {
   const shape = state.pointer.tempShape;
   if (!shape) return;
+  markHistoryChanged();
   switch (shape.type) {
     case "rectangle":
     case "square": {
@@ -1803,8 +2367,13 @@ function finalizeTempShape(point) {
     }
   }
 
+  markHistoryChanged();
   ensureBaseKeyframe(shape, state.timeline.current);
-  writeKeyframe(shape, state.timeline.current);
+  writeKeyframe(shape, state.timeline.current, { markSelected: false });
+  updateSelection(shape);
+  if (state.tool !== "select") {
+    setTool("select");
+  }
 }
 
 function removeShape(shape) {
@@ -1820,7 +2389,7 @@ function removeShape(shape) {
 
 function commitShapeChange(shape) {
   if (!shape) return;
-  writeKeyframe(shape, state.timeline.current);
+  writeKeyframe(shape, state.timeline.current, { markSelected: false });
 }
 
 function createShape(type, start, end) {
@@ -2023,7 +2592,7 @@ function setSelectedShapes(shapes, { primaryId } = {}) {
     state.timeline.selectedKeyframeTime = null;
   }
 
-  state.activeGroupId = resolveSelectedGroupId();
+  setActiveGroupId(resolveSelectedGroupId());
   refreshSelectionUI();
 }
 
@@ -2253,6 +2822,7 @@ function applyZOrderAction(action) {
   if (!state.selectedIds || state.selectedIds.size === 0) return false;
 
   const selectedIds = new Set(state.selectedIds);
+  const historyEntry = createHistoryEntry("reorder-shapes");
   let didChange = false;
 
   switch (action) {
@@ -2309,6 +2879,7 @@ function applyZOrderAction(action) {
   }
 
   if (didChange) {
+    commitHistoryEntry(historyEntry);
     refreshSelectionUI();
   }
 
@@ -2365,8 +2936,8 @@ function refreshSelectionUI() {
   }
   if (elements.ungroupShapes) {
     const activeSelectionGroupId = resolveSelectedGroupId();
-    state.activeGroupId = activeSelectionGroupId;
-    const groupSize = activeSelectionGroupId ? state.groups[activeSelectionGroupId]?.size ?? 0 : 0;
+    setActiveGroupId(activeSelectionGroupId);
+    const groupSize = state.activeGroupId ? state.groups[state.activeGroupId]?.size ?? 0 : 0;
     elements.ungroupShapes.disabled = !activeSelectionGroupId || groupSize < 2;
   }
 
@@ -2476,10 +3047,18 @@ function removeShapeFromGroup(shape, groupId) {
         }
       });
       delete state.groups[groupId];
+      if (state.activeGroupId === groupId) {
+        setActiveGroupId(null);
+      } else {
+        syncActiveGroupState();
+      }
     }
   }
   if (shape.groupId === groupId) {
     delete shape.groupId;
+  }
+  if (state.activeGroupId === groupId) {
+    syncActiveGroupState();
   }
 }
 
@@ -2505,13 +3084,18 @@ function pruneEmptyGroups() {
       });
       delete state.groups[groupId];
       if (state.activeGroupId === groupId) {
-        state.activeGroupId = null;
+        setActiveGroupId(null);
+      } else {
+        syncActiveGroupState();
       }
       return;
     }
 
     if (validMembers.length !== members.size) {
       state.groups[groupId] = new Set(validMembers);
+      if (state.activeGroupId === groupId) {
+        syncActiveGroupState();
+      }
     }
   });
 }
@@ -2552,7 +3136,7 @@ function rebuildGroupStateFromShapes() {
   });
 
   state.groups = nextGroups;
-  state.activeGroupId = null;
+  setActiveGroupId(null);
   if (Number.isFinite(maxNumericId) && maxNumericId > 0) {
     groupIdCounter = Math.max(groupIdCounter, maxNumericId + 1);
   }
@@ -2562,6 +3146,8 @@ function deleteSelectedShapes() {
   if (!state.selectedIds || state.selectedIds.size === 0) return false;
   const ids = new Set(state.selectedIds);
   if (ids.size === 0) return false;
+
+  pushHistorySnapshot("delete-shapes");
 
   if (state.activeTextEditor && ids.has(state.activeTextEditor.shapeId)) {
     destroyActiveTextEditorElement();
@@ -2579,7 +3165,7 @@ function deleteSelectedShapes() {
   state.selectedIds.clear();
   state.selection = null;
   pruneEmptyGroups();
-  state.activeGroupId = null;
+  setActiveGroupId(null);
   state.timeline.selectedKeyframeTime = null;
   resetPointerInteraction();
   state.pointer.down = false;
@@ -2589,21 +3175,34 @@ function deleteSelectedShapes() {
 
 function handleGlobalKeyDown(event) {
   if (event.defaultPrevented) return;
+
+  const activeElement = document.activeElement;
+  const tagName = activeElement?.tagName;
+  const isEditable = Boolean(activeElement?.isContentEditable);
+  const isTextInput = isEditable || tagName === "INPUT" || tagName === "TEXTAREA";
+  const key = typeof event.key === "string" ? event.key.toLowerCase() : event.key;
+
+  if (!event.shiftKey && (event.ctrlKey || event.metaKey) && key === "z") {
+    if (isTextInput) {
+      return;
+    }
+    if (undoLastAction()) {
+      event.preventDefault();
+    }
+    return;
+  }
+
   if (event.key === "Escape") {
     if (closeAllContextMenus()) {
       event.preventDefault();
       return;
     }
   }
+
   if (event.key !== "Delete" && event.key !== "Backspace") return;
 
-  const activeElement = document.activeElement;
-  if (activeElement) {
-    const tagName = activeElement.tagName;
-    const isEditable = activeElement.isContentEditable;
-    if (isEditable || tagName === "INPUT" || tagName === "TEXTAREA") {
-      return;
-    }
+  if (isTextInput) {
+    return;
   }
 
   if (state.selection && state.selectedIds.size === 1 && typeof state.timeline.selectedKeyframeTime === "number") {
@@ -2913,7 +3512,7 @@ function ensureBaseKeyframe(shape, time = 0) {
   normalizeShapeKeyframes(shape);
 }
 
-function writeKeyframe(shape, time, { apply = true, render = true } = {}) {
+function writeKeyframe(shape, time, { apply = true, render = true, markSelected = true } = {}) {
   if (!shape) return;
   const rounded = clampTimelineTime(time, state.timeline.current);
   const existing = shape.keyframes.find((keyframe) => Math.abs(keyframe.time - rounded) < KEYFRAME_EPSILON);
@@ -2925,7 +3524,16 @@ function writeKeyframe(shape, time, { apply = true, render = true } = {}) {
   }
   normalizeShapeKeyframes(shape);
   if (state.selection && state.selectedIds.size === 1 && state.selection.id === shape.id) {
-    state.timeline.selectedKeyframeTime = rounded;
+    if (markSelected) {
+      state.timeline.selectedKeyframeTime = rounded;
+    } else if (typeof state.timeline.selectedKeyframeTime === "number") {
+      const hasMatch = shape.keyframes.some(
+        (keyframe) => Math.abs(keyframe.time - state.timeline.selectedKeyframeTime) < KEYFRAME_EPSILON,
+      );
+      if (!hasMatch) {
+        state.timeline.selectedKeyframeTime = null;
+      }
+    }
   }
   if (apply) {
     applyTimelineState();
@@ -3467,38 +4075,83 @@ function restoreStageBackground() {
   applyStageBackground(target, { updateControl: true, persist: false });
 }
 
+function extractStagePointerData(event, pointerId = null) {
+  if (event.changedTouches && event.changedTouches.length > 0) {
+    const touch = getTouchById(event.changedTouches, pointerId);
+    if (!touch) {
+      return null;
+    }
+    return {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      pointerId: touch.identifier,
+      isTouch: true,
+    };
+  }
+  if (event.touches && event.touches.length > 0 && pointerId !== null) {
+    const touch = getTouchById(event.touches, pointerId);
+    if (touch) {
+      return {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        pointerId: touch.identifier,
+        isTouch: true,
+      };
+    }
+  }
+  if (typeof event.clientX === "number" && typeof event.clientY === "number") {
+    return {
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pointerId: event.pointerId ?? pointerId ?? 0,
+      isTouch: false,
+    };
+  }
+  return null;
+}
+
 function startStageResize(event) {
   if (state.stage.resizeSession) {
     return;
   }
+  const data = extractStagePointerData(event);
+  if (!data) {
+    return;
+  }
   event.preventDefault();
-  const pointerId = event.pointerId ?? 0;
   const mode = event.currentTarget?.getAttribute("data-stage-resize") || "corner";
   state.stage.resizeSession = {
-    pointerId,
-    startX: event.clientX,
-    startY: event.clientY,
+    pointerId: data.pointerId,
+    startX: data.clientX,
+    startY: data.clientY,
     startWidth: state.stage.width,
     startHeight: state.stage.height,
     mode,
     handle: event.currentTarget || null,
+    isTouch: data.isTouch,
   };
-  try {
-    event.currentTarget?.setPointerCapture(pointerId);
-  } catch (error) {
-    // Ignore pointer capture errors
+  if (!data.isTouch) {
+    try {
+      event.currentTarget?.setPointerCapture(data.pointerId);
+    } catch (error) {
+      // Ignore pointer capture errors
+    }
   }
   elements.canvasWrapper?.classList.add("is-resizing");
 }
 
 function handleStageResizeMove(event) {
   const session = state.stage.resizeSession;
-  if (!session || (event.pointerId ?? session.pointerId) !== session.pointerId) {
+  if (!session) {
+    return;
+  }
+  const data = extractStagePointerData(event, session.pointerId);
+  if (!data || data.pointerId !== session.pointerId) {
     return;
   }
   event.preventDefault();
-  const deltaX = event.clientX - session.startX;
-  const deltaY = event.clientY - session.startY;
+  const deltaX = data.clientX - session.startX;
+  const deltaY = data.clientY - session.startY;
   let targetWidth = session.startWidth;
   let targetHeight = session.startHeight;
   if (session.mode === "corner" || session.mode === "right") {
@@ -3512,13 +4165,19 @@ function handleStageResizeMove(event) {
 
 function endStageResize(event) {
   const session = state.stage.resizeSession;
-  if (!session || (event.pointerId ?? session.pointerId) !== session.pointerId) {
+  if (!session) {
     return;
   }
-  try {
-    session.handle?.releasePointerCapture(session.pointerId);
-  } catch (error) {
-    // Ignore release errors
+  const data = extractStagePointerData(event, session.pointerId);
+  if (!data || data.pointerId !== session.pointerId) {
+    return;
+  }
+  if (!session.isTouch) {
+    try {
+      session.handle?.releasePointerCapture(session.pointerId);
+    } catch (error) {
+      // Ignore release errors
+    }
   }
   state.stage.resizeSession = null;
   elements.canvasWrapper?.classList.remove("is-resizing");
@@ -3764,9 +4423,31 @@ function getShapeRotation(shape) {
 
 function getCanvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
+  let clientX = 0;
+  let clientY = 0;
+
+  if (typeof event.clientX === "number" && typeof event.clientY === "number") {
+    clientX = event.clientX;
+    clientY = event.clientY;
+  } else if (event.touches && event.touches.length > 0) {
+    clientX = event.touches[0].clientX;
+    clientY = event.touches[0].clientY;
+  } else if (event.changedTouches && event.changedTouches.length > 0) {
+    clientX = event.changedTouches[0].clientX;
+    clientY = event.changedTouches[0].clientY;
+  } else if (typeof event.pageX === "number" && typeof event.pageY === "number") {
+    clientX = event.pageX - window.pageXOffset;
+    clientY = event.pageY - window.pageYOffset;
+  }
+
+  const width = rect.width || 1;
+  const height = rect.height || 1;
+  const scaleX = Number.isFinite(state.stage.width) && width !== 0 ? state.stage.width / width : 1;
+  const scaleY = Number.isFinite(state.stage.height) && height !== 0 ? state.stage.height / height : 1;
+
   return {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top,
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY,
   };
 }
 
@@ -4070,6 +4751,7 @@ function confineShapeToStage(shape, stageWidth, stageHeight) {
 
 function applyImportedScene(payload) {
   if (!payload || typeof payload !== "object") return;
+  const historyEntry = createHistoryEntry("import-scene");
   const shapes = Array.isArray(payload.shapes) ? payload.shapes : [];
 
   const normalizedShapes = shapes.map((entry) => {
@@ -4126,7 +4808,7 @@ function applyImportedScene(payload) {
 
   state.shapes = normalizedShapes;
   state.groups = {};
-  state.activeGroupId = null;
+  setActiveGroupId(null);
 
   if (state.shapes.length > 0) {
     const maxId = Math.max(...state.shapes.map((shape) => Number(shape.id) || 0));
@@ -4212,6 +4894,7 @@ function applyImportedScene(payload) {
   }
 
   renderTimelineTrackMarkers();
+  commitHistoryEntry(historyEntry);
 }
 
 function exportScene() {
@@ -4418,13 +5101,14 @@ function createAnimatorApi() {
       if (!state.clipboard || !Array.isArray(state.clipboard.items) || state.clipboard.items.length === 0) {
         return false;
       }
+      pushHistorySnapshot("paste-from-clipboard");
       const delta = offsetClipboard();
       let last = null;
       state.clipboard.items.forEach((item) => {
         const clone = duplicateShape(item, delta);
         state.shapes.push(clone);
         ensureBaseKeyframe(clone, state.timeline.current);
-        writeKeyframe(clone, state.timeline.current);
+  writeKeyframe(clone, state.timeline.current, { markSelected: false });
         last = clone;
       });
       if (last) {
@@ -4433,9 +5117,13 @@ function createAnimatorApi() {
       return true;
     },
     clearCanvas() {
+      if (state.shapes.length === 0) {
+        return true;
+      }
+      pushHistorySnapshot("clear-canvas");
       state.shapes = [];
       state.groups = {};
-      state.activeGroupId = null;
+  setActiveGroupId(null);
       updateSelection(null);
       renderKeyframeList();
       renderTimelineTrackMarkers();
@@ -4450,6 +5138,7 @@ function createAnimatorApi() {
     },
     createImageShapeFromSource(src) {
       if (!src) return null;
+      pushHistorySnapshot("create-image");
       const now = state.timeline.current;
       const shape = {
         id: shapeIdCounter++,
@@ -4488,13 +5177,13 @@ function createAnimatorApi() {
         shape.live.height = height;
         shape.live.x = state.stage.width / 2 - width / 2;
         shape.live.y = state.stage.height / 2 - height / 2;
-        writeKeyframe(shape, state.timeline.current);
+  writeKeyframe(shape, state.timeline.current, { markSelected: false });
       });
       shape.asset.image.src = src;
 
       state.shapes.push(shape);
       ensureBaseKeyframe(shape, now);
-      writeKeyframe(shape, now);
+  writeKeyframe(shape, now, { markSelected: false });
       updateSelection(shape);
       return cloneShape(shape);
     },
