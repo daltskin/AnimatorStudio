@@ -867,6 +867,9 @@ function bindEvents() {
   });
 
   window.addEventListener("keydown", handleGlobalKeyDown);
+  window.addEventListener("copy", handleGlobalCopy);
+  window.addEventListener("cut", handleGlobalCut);
+  window.addEventListener("paste", handleGlobalPaste);
 
   elements.shapeContextMenu?.addEventListener("click", handleContextMenuActionClick);
 
@@ -2160,7 +2163,7 @@ function rotateShape(shape, point) {
   const currentAngle = Math.atan2(point.y - center.y, point.x - center.x);
   const delta = currentAngle - startAngle;
 
-  if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "text") {
+  if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "text" || shape.type === "image") {
     shape.live.rotation = normalizeAngle(baseRotation + delta);
     shape.live.width = snapshot.width;
     shape.live.height = snapshot.height;
@@ -2250,7 +2253,7 @@ function getRotationHandlePosition(shape) {
   if (!center) return null;
   const offset = 36;
 
-  if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "text") {
+  if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "text" || shape.type === "image") {
     const rotation = shape.live.rotation || 0;
     const halfHeight = shape.live.height / 2;
     const anchorVec = rotateVector({ x: 0, y: -halfHeight }, rotation);
@@ -2511,7 +2514,8 @@ function isPointInsideShape(shape, point) {
   switch (shape.type) {
     case "rectangle":
     case "square":
-    case "text": {
+    case "text":
+    case "image": {
       const center = getShapeCenter(shape);
       const rotation = shape.live.rotation || 0;
       const local = toLocalPoint(point, center, rotation);
@@ -3173,20 +3177,274 @@ function deleteSelectedShapes() {
   return true;
 }
 
+function isTextInputActive() {
+  const activeElement = document.activeElement;
+  if (!activeElement) return false;
+
+  if (typeof activeElement.isContentEditable === "boolean" && activeElement.isContentEditable) {
+    return true;
+  }
+
+  if (activeElement instanceof HTMLTextAreaElement) {
+    return !activeElement.readOnly && !activeElement.disabled;
+  }
+
+  if (activeElement instanceof HTMLInputElement) {
+    if (activeElement.readOnly || activeElement.disabled) {
+      return false;
+    }
+    const type = (activeElement.getAttribute("type") || "text").toLowerCase();
+    const textLikeTypes = new Set(["text", "search", "email", "url", "tel", "password", "number"]);
+    return textLikeTypes.has(type);
+  }
+
+  return false;
+}
+
+function ensureClipboardState() {
+  if (!state.clipboard) {
+    state.clipboard = { items: [], offset: { x: 32, y: 32 } };
+  }
+  if (!state.clipboard.offset) {
+    state.clipboard.offset = { x: 32, y: 32 };
+  }
+  if (!Array.isArray(state.clipboard.items)) {
+    state.clipboard.items = [];
+  }
+  return state.clipboard;
+}
+
+function resetClipboardOffset() {
+  ensureClipboardState();
+  state.clipboard.offset = { x: 32, y: 32 };
+}
+
+function nextClipboardOffset() {
+  const clipboard = ensureClipboardState();
+  const next = { x: clipboard.offset.x, y: clipboard.offset.y };
+  clipboard.offset.x = Math.min(160, clipboard.offset.x + 16);
+  clipboard.offset.y = Math.min(160, clipboard.offset.y + 16);
+  if (clipboard.offset.x >= 160) clipboard.offset.x = 32;
+  if (clipboard.offset.y >= 160) clipboard.offset.y = 32;
+  return next;
+}
+
+function duplicateShapeForClipboard(shape, delta) {
+  const clone = cloneShape(shape);
+  clone.id = shapeIdCounter++;
+  clone.birthTime = state.timeline.current;
+  clone.isVisible = true;
+  if (clone.groupId) {
+    delete clone.groupId;
+  }
+  if (clone.type === "line" || clone.type === "arrow") {
+    clone.live.start.x += delta.x;
+    clone.live.start.y += delta.y;
+    clone.live.end.x += delta.x;
+    clone.live.end.y += delta.y;
+  } else if (clone.type === "free") {
+    clone.live.points = clone.live.points.map((point) => ({ x: point.x + delta.x, y: point.y + delta.y }));
+  } else {
+    clone.live.x += delta.x;
+    clone.live.y += delta.y;
+  }
+  if (clone.asset && clone.asset.source) {
+    clone.asset.image = null;
+    rehydrateShapeAsset(clone);
+  }
+  return clone;
+}
+
+function copySelectionToClipboard() {
+  const selected = getSelectedShapesList();
+  if (selected.length === 0) return false;
+  ensureClipboardState();
+  state.clipboard.items = selected.map((shape) => cloneShape(shape));
+  resetClipboardOffset();
+  return true;
+}
+
+function pasteClipboardItems() {
+  const clipboard = ensureClipboardState();
+  if (!clipboard.items || clipboard.items.length === 0) {
+    return false;
+  }
+  pushHistorySnapshot("paste-from-clipboard");
+  const delta = nextClipboardOffset();
+  let last = null;
+  clipboard.items.forEach((item) => {
+    const clone = duplicateShapeForClipboard(item, delta);
+    state.shapes.push(clone);
+    ensureBaseKeyframe(clone, state.timeline.current);
+    writeKeyframe(clone, state.timeline.current, { markSelected: false });
+    last = clone;
+  });
+  if (last) {
+    updateSelection(last);
+  }
+  return Boolean(last);
+}
+
+function createImageShapeFromSourceInternal(src, { select = true, addHistory = true } = {}) {
+  if (!src) return null;
+  if (addHistory) {
+    pushHistorySnapshot("create-image");
+  }
+  closeAllContextMenus();
+
+  const now = state.timeline.current;
+  const shape = {
+    id: shapeIdCounter++,
+    type: "image",
+    style: {
+      fill: state.style.fill,
+      stroke: state.style.stroke,
+      strokeWidth: state.style.strokeWidth,
+      sketchLevel: 0,
+      opacity: state.style.opacity ?? 1,
+      rotation: 0,
+    },
+    live: {
+      x: state.stage.width / 2 - 96,
+      y: state.stage.height / 2 - 96,
+      width: 192,
+      height: 192,
+      rotation: 0,
+    },
+    keyframes: [],
+    birthTime: now,
+    isVisible: true,
+    asset: {
+      source: src,
+      image: new Image(),
+    },
+  };
+
+  shape.asset.image.addEventListener("load", () => {
+    const img = shape.asset.image;
+    const aspect = img && img.height !== 0 ? img.width / img.height : 1;
+    const baseWidth = Math.min(state.stage.width * 0.4, Math.max(96, img.width || 0));
+    const width = baseWidth;
+    const height = aspect !== 0 ? baseWidth / aspect : baseWidth;
+    shape.live.width = width;
+    shape.live.height = height;
+    shape.live.x = state.stage.width / 2 - width / 2;
+    shape.live.y = state.stage.height / 2 - height / 2;
+    writeKeyframe(shape, state.timeline.current, { markSelected: false });
+  });
+  shape.asset.image.addEventListener("error", () => {
+    // Leave the shape in place even if the image fails to load.
+  });
+  shape.asset.image.src = src;
+
+  state.shapes.push(shape);
+  ensureBaseKeyframe(shape, now);
+  writeKeyframe(shape, now, { markSelected: false });
+  if (select) {
+    updateSelection(shape);
+  } else {
+    refreshSelectionUI();
+  }
+  return cloneShape(shape);
+}
+
+function pasteImageBlob(blob) {
+  if (!blob) return false;
+  try {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => {
+      const result = reader.result;
+      if (typeof result === "string" && result) {
+        createImageShapeFromSourceInternal(result);
+      }
+    });
+    reader.readAsDataURL(blob);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+function maybePasteImageFromClipboard(clipboardData) {
+  if (!clipboardData) return false;
+
+  const itemList = clipboardData.items ? Array.from(clipboardData.items) : [];
+  for (const item of itemList) {
+    if (!item) continue;
+    if (item.kind === "file" && typeof item.type === "string" && item.type.startsWith("image/")) {
+      const file = typeof item.getAsFile === "function" ? item.getAsFile() : null;
+      if (file && pasteImageBlob(file)) {
+        return true;
+      }
+    }
+  }
+
+  const fileList = clipboardData.files ? Array.from(clipboardData.files) : [];
+  for (const file of fileList) {
+    if (file && typeof file.type === "string" && file.type.startsWith("image/") && pasteImageBlob(file)) {
+      return true;
+    }
+  }
+
+  if (typeof clipboardData.getData === "function") {
+    const html = clipboardData.getData("text/html");
+    if (html && html.includes("<img")) {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const img = doc.querySelector("img[src]");
+        const src = img?.getAttribute("src");
+        if (src && (src.startsWith("data:image") || src.startsWith("http://") || src.startsWith("https://"))) {
+          createImageShapeFromSourceInternal(src);
+          return true;
+        }
+      } catch (error) {
+        // Ignore HTML parsing errors and continue.
+      }
+    }
+
+    const text = clipboardData.getData("text/plain");
+    if (typeof text === "string" && text.trim().startsWith("data:image")) {
+      createImageShapeFromSourceInternal(text.trim());
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function handleGlobalKeyDown(event) {
   if (event.defaultPrevented) return;
 
-  const activeElement = document.activeElement;
-  const tagName = activeElement?.tagName;
-  const isEditable = Boolean(activeElement?.isContentEditable);
-  const isTextInput = isEditable || tagName === "INPUT" || tagName === "TEXTAREA";
+  const isTextInput = isTextInputActive();
   const key = typeof event.key === "string" ? event.key.toLowerCase() : event.key;
+  const hasCommandModifier = event.ctrlKey || event.metaKey;
 
-  if (!event.shiftKey && (event.ctrlKey || event.metaKey) && key === "z") {
+  if (hasCommandModifier && !event.shiftKey && key === "z") {
     if (isTextInput) {
       return;
     }
     if (undoLastAction()) {
+      event.preventDefault();
+    }
+    return;
+  }
+
+  if (hasCommandModifier && !event.shiftKey && key === "c") {
+    if (isTextInput) {
+      return;
+    }
+    if (copySelectionToClipboard()) {
+      event.preventDefault();
+    }
+    return;
+  }
+
+  if (hasCommandModifier && !event.shiftKey && key === "v") {
+    if (isTextInput) {
+      return;
+    }
+    if (pasteClipboardItems()) {
       event.preventDefault();
     }
     return;
@@ -3216,6 +3474,36 @@ function handleGlobalKeyDown(event) {
   }
 
   if (deleteSelectedShapes()) {
+    event.preventDefault();
+  }
+}
+
+function handleGlobalCopy(event) {
+  if (event.defaultPrevented) return;
+  if (isTextInputActive()) return;
+  if (copySelectionToClipboard()) {
+    event.preventDefault();
+  }
+}
+
+function handleGlobalCut(event) {
+  if (event.defaultPrevented) return;
+  if (isTextInputActive()) return;
+  if (copySelectionToClipboard()) {
+    deleteSelectedShapes();
+    event.preventDefault();
+  }
+}
+
+function handleGlobalPaste(event) {
+  if (event.defaultPrevented) return;
+  if (isTextInputActive()) return;
+  const clipboardData = event.clipboardData || window.clipboardData || null;
+  if (clipboardData && maybePasteImageFromClipboard(clipboardData)) {
+    event.preventDefault();
+    return;
+  }
+  if (pasteClipboardItems()) {
     event.preventDefault();
   }
 }
@@ -4933,47 +5221,6 @@ function createAnimatorApi() {
     return selected.length > 0 ? selected[0] : null;
   };
 
-  const offsetClipboard = () => {
-    if (!state.clipboard) {
-      state.clipboard = { items: [], offset: { x: 32, y: 32 } };
-    }
-    if (!state.clipboard.offset) {
-      state.clipboard.offset = { x: 32, y: 32 };
-    }
-    const next = { x: state.clipboard.offset.x, y: state.clipboard.offset.y };
-    state.clipboard.offset.x = Math.min(160, state.clipboard.offset.x + 16);
-    state.clipboard.offset.y = Math.min(160, state.clipboard.offset.y + 16);
-    if (state.clipboard.offset.x >= 160) state.clipboard.offset.x = 32;
-    if (state.clipboard.offset.y >= 160) state.clipboard.offset.y = 32;
-    return next;
-  };
-
-  const duplicateShape = (shape, delta) => {
-    const clone = cloneShape(shape);
-    clone.id = shapeIdCounter++;
-    clone.birthTime = state.timeline.current;
-    clone.isVisible = true;
-    if (clone.groupId) {
-      delete clone.groupId;
-    }
-    if (clone.type === "line" || clone.type === "arrow") {
-      clone.live.start.x += delta.x;
-      clone.live.start.y += delta.y;
-      clone.live.end.x += delta.x;
-      clone.live.end.y += delta.y;
-    } else if (clone.type === "free") {
-      clone.live.points = clone.live.points.map((point) => ({ x: point.x + delta.x, y: point.y + delta.y }));
-    } else {
-      clone.live.x += delta.x;
-      clone.live.y += delta.y;
-    }
-    if (clone.asset && clone.asset.source) {
-      clone.asset.image = null;
-      rehydrateShapeAsset(clone);
-    }
-    return clone;
-  };
-
   const captureTimelineFrames = async ({ fps = state.timeline.exportFps || 12, maxFrames = 360, onFrame } = {}) => {
     const duration = Math.max(0, state.timeline.duration);
     const step = fps <= 0 ? 0 : 1 / fps;
@@ -5072,6 +5319,17 @@ function createAnimatorApi() {
       if (!handle) return null;
       return toClientPoint(handle.position);
     },
+    getRotationHandleData(targetId) {
+      const shape = resolveShape(targetId);
+      if (!shape) return null;
+      const handle = getRotationHandlePosition(shape);
+      if (!handle) return null;
+      return {
+        position: { ...handle.position },
+        anchor: handle.anchor ? { ...handle.anchor } : null,
+        center: handle.center ? { ...handle.center } : null,
+      };
+    },
     getConnectorBendHandleClientPoint(targetId) {
       const shape = resolveShape(targetId);
       if (!shape || (shape.type !== "line" && shape.type !== "arrow")) return null;
@@ -5091,30 +5349,10 @@ function createAnimatorApi() {
       return toClientPoint(control);
     },
     copySelection() {
-      const selected = getSelectedShapesList();
-      if (selected.length === 0) return false;
-      state.clipboard.items = selected.map((shape) => cloneShape(shape));
-      state.clipboard.offset = { x: 32, y: 32 };
-      return true;
+      return copySelectionToClipboard();
     },
     pasteFromClipboard() {
-      if (!state.clipboard || !Array.isArray(state.clipboard.items) || state.clipboard.items.length === 0) {
-        return false;
-      }
-      pushHistorySnapshot("paste-from-clipboard");
-      const delta = offsetClipboard();
-      let last = null;
-      state.clipboard.items.forEach((item) => {
-        const clone = duplicateShape(item, delta);
-        state.shapes.push(clone);
-        ensureBaseKeyframe(clone, state.timeline.current);
-  writeKeyframe(clone, state.timeline.current, { markSelected: false });
-        last = clone;
-      });
-      if (last) {
-        updateSelection(last);
-      }
-      return true;
+      return pasteClipboardItems();
     },
     clearCanvas() {
       if (state.shapes.length === 0) {
@@ -5137,55 +5375,7 @@ function createAnimatorApi() {
       return true;
     },
     createImageShapeFromSource(src) {
-      if (!src) return null;
-      pushHistorySnapshot("create-image");
-      const now = state.timeline.current;
-      const shape = {
-        id: shapeIdCounter++,
-        type: "image",
-        style: {
-          fill: state.style.fill,
-          stroke: state.style.stroke,
-          strokeWidth: state.style.strokeWidth,
-          sketchLevel: 0,
-          opacity: state.style.opacity ?? 1,
-          rotation: 0,
-        },
-        live: {
-          x: state.stage.width / 2 - 96,
-          y: state.stage.height / 2 - 96,
-          width: 192,
-          height: 192,
-          rotation: 0,
-        },
-        keyframes: [],
-        birthTime: now,
-        isVisible: true,
-        asset: {
-          source: src,
-          image: new Image(),
-        },
-      };
-
-      shape.asset.image.addEventListener("load", () => {
-        const img = shape.asset.image;
-        const aspect = img && img.height !== 0 ? img.width / img.height : 1;
-        const baseWidth = Math.min(state.stage.width * 0.4, Math.max(96, img.width));
-        const width = baseWidth;
-        const height = aspect !== 0 ? baseWidth / aspect : baseWidth;
-        shape.live.width = width;
-        shape.live.height = height;
-        shape.live.x = state.stage.width / 2 - width / 2;
-        shape.live.y = state.stage.height / 2 - height / 2;
-  writeKeyframe(shape, state.timeline.current, { markSelected: false });
-      });
-      shape.asset.image.src = src;
-
-      state.shapes.push(shape);
-      ensureBaseKeyframe(shape, now);
-  writeKeyframe(shape, now, { markSelected: false });
-      updateSelection(shape);
-      return cloneShape(shape);
+      return createImageShapeFromSourceInternal(src);
     },
     advanceTimelineForTest(seconds) {
       const delta = Math.max(0, Number(seconds) || 0);

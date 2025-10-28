@@ -308,9 +308,13 @@ async function getSelectionClientCenter(page) {
     const bounds = window.animatorApi?.getShapeBounds(selection.id);
     if (!bounds) return null;
     const rect = canvas.getBoundingClientRect();
+    const stageWidth = window.animatorState?.stage?.width ?? rect.width;
+    const stageHeight = window.animatorState?.stage?.height ?? rect.height;
+    const scaleX = stageWidth && rect.width ? stageWidth / rect.width : 1;
+    const scaleY = stageHeight && rect.height ? stageHeight / rect.height : 1;
     return {
-      x: rect.left + bounds.x + bounds.width / 2,
-      y: rect.top + bounds.y + bounds.height / 2,
+      x: rect.left + bounds.x / scaleX + bounds.width / scaleX / 2,
+      y: rect.top + bounds.y / scaleY + bounds.height / scaleY / 2,
     };
   });
 }
@@ -455,6 +459,15 @@ async function waitForExportStatus(page, matcher, { timeout = 10000 } = {}) {
   return status;
 }
 
+async function pressShortcut(page, key) {
+  const keyUpper = key.length === 1 ? key.toUpperCase() : key;
+  const modifier = await page.evaluate(() => {
+    const platform = navigator.platform || navigator.userAgent || '';
+    return /mac/i.test(platform) ? 'Meta' : 'Control';
+  });
+  await page.keyboard.press(`${modifier}+${keyUpper}`);
+}
+
 module.exports = {
   loadApp,
   dispatchPointerEvent,
@@ -481,4 +494,5 @@ module.exports = {
   getRotationHandleInfo,
   rotateSelectionFromHandle,
   waitForExportStatus,
+  pressShortcut,
 };

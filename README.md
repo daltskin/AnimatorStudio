@@ -2,6 +2,10 @@
 
 Animator Studio is a lightweight web app for building presentation-friendly motion graphics right inside the browser. Drag shapes onto the stage, wire them up with animated connectors, then bring everything to life on a tactile timeline.
 
+# Demo
+
+Have a play with it [here](https://animatorstudio.gentlebay-3289cfef.westus2.azurecontainerapps.io/), either start something new, or load one of the samples in this repo.
+
 ## ✨ Feature Highlights
 
 - **Rich shape library:** Rectangle, square, circle, arrow, straight line, and free-draw pen.

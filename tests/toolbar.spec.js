@@ -15,9 +15,11 @@ const {
   getSelectedShapeSnapshot,
   getShapeSnapshot,
   getShapeBounds,
+  getSelectionClientCenter,
   resizeShapeFromHandle,
   getRotationHandleInfo,
   rotateSelectionFromHandle,
+  pressShortcut,
 } = require('./utils');
 
 const DUMMY_IMAGE_SRC =
@@ -356,6 +358,198 @@ test.describe('Toolbar interactions', () => {
     const deltaY = Math.abs(positions[0].y - positions[1].y);
     expect(deltaX).toBeGreaterThanOrEqual(30);
     expect(deltaY).toBeGreaterThanOrEqual(30);
+  });
+
+  test('copy and paste duplicates shapes using keyboard shortcut', async ({ page }) => {
+    await loadApp(page);
+
+    await setTool(page, 'rectangle');
+    await drawRectangle(page);
+
+    await ensureShapeCount(page, 1);
+    await ensureSelectionCount(page, 1);
+
+    await pressShortcut(page, 'c');
+
+    await waitForClipboardItems(page, 1);
+
+    await pressShortcut(page, 'v');
+
+    await expect.poll(() => page.evaluate(() => window.animatorState.shapes.length)).toBe(2);
+    await ensureSelectionCount(page, 1);
+
+    const positions = await page.evaluate(() =>
+      window.animatorState.shapes.map((shape) => ({
+        id: shape.id,
+        x: shape.live.x,
+        y: shape.live.y,
+      })),
+    );
+
+    expect(positions.length).toBe(2);
+    const deltaX = Math.abs(positions[0].x - positions[1].x);
+    const deltaY = Math.abs(positions[0].y - positions[1].y);
+    expect(deltaX).toBeGreaterThanOrEqual(30);
+    expect(deltaY).toBeGreaterThanOrEqual(30);
+
+  });
+
+  test('paste still works when stage context menu and color input have focus', async ({ page }) => {
+    await loadApp(page);
+
+    await setTool(page, 'rectangle');
+    await drawRectangle(page);
+
+    await ensureShapeCount(page, 1);
+    await ensureSelectionCount(page, 1);
+
+    await pressShortcut(page, 'c');
+    await waitForClipboardItems(page, 1);
+
+    const stage = page.locator('#stage');
+    await stage.click({ position: { x: 10, y: 10 } });
+    await ensureSelectionCount(page, 0);
+
+    await stage.click({ button: 'right', position: { x: 20, y: 20 } });
+
+    await pressShortcut(page, 'v');
+
+    await expect.poll(() => page.evaluate(() => window.animatorState.shapes.length)).toBe(2);
+    await ensureSelectionCount(page, 1);
+  });
+
+  test('pasted image behaves like other shapes', async ({ page }) => {
+    await loadApp(page);
+
+    await expect.poll(() => page.evaluate(() => window.animatorState.shapes.length)).toBe(0);
+
+    const base64Pixel =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
+
+    await page.evaluate((dataUrl) => {
+      const binary = atob(dataUrl);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+      const blob = new Blob([bytes], { type: 'image/png' });
+      const file = new File([blob], 'pasted.png', { type: 'image/png' });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      const event = new ClipboardEvent('paste', {
+        clipboardData: dataTransfer,
+        bubbles: true,
+        cancelable: true,
+      });
+      Object.defineProperty(event, 'clipboardData', {
+        value: dataTransfer,
+        enumerable: true,
+      });
+      window.dispatchEvent(event);
+    }, base64Pixel);
+
+    await expect.poll(() =>
+      page.evaluate(() => window.animatorState.shapes.filter((shape) => shape.type === 'image').length),
+    ).toBe(1);
+
+    await expect.poll(() => page.evaluate(() => window.animatorState.selectedIds.size)).toBe(1);
+
+    const imageBounds = await getShapeBounds(page);
+    expect(imageBounds).not.toBeNull();
+    if (!imageBounds) throw new Error('Image bounds unavailable');
+    expect(imageBounds.width).toBeGreaterThan(0);
+    expect(imageBounds.height).toBeGreaterThan(0);
+
+    await setTool(page, 'select');
+
+    const imageId = await page.evaluate(() => window.animatorState.selection?.id ?? null);
+    expect(imageId).not.toBeNull();
+    if (!imageId) throw new Error('Missing pasted image selection');
+
+    const selectionMeta = await page.evaluate(() => {
+      const selection = window.animatorState.selection;
+      if (!selection) return null;
+      return {
+        type: selection.type,
+        width: selection.live?.width ?? null,
+        height: selection.live?.height ?? null,
+        rotation: selection.live?.rotation ?? null,
+      };
+    });
+    expect(selectionMeta).not.toBeNull();
+    if (!selectionMeta) throw new Error('Missing selection meta');
+    expect(selectionMeta.type).toBe('image');
+
+    const initialRotationHandle = await page.evaluate((id) => {
+      return window.animatorApi?.getRotationHandleData(id) ?? null;
+    }, imageId);
+    expect(initialRotationHandle).not.toBeNull();
+
+    const initialPosition = await page.evaluate((id) => {
+      const shape = window.animatorState.shapes.find((entry) => entry.id === id);
+      if (!shape) return null;
+      return { x: shape.live.x, y: shape.live.y };
+    }, imageId);
+    expect(initialPosition).not.toBeNull();
+    if (!initialPosition) throw new Error('Initial position unavailable');
+
+    const selectionCenter = await getSelectionClientCenter(page);
+    expect(selectionCenter).not.toBeNull();
+    if (!selectionCenter) throw new Error('Selection center unavailable');
+
+    await page.mouse.move(selectionCenter.x, selectionCenter.y);
+    await page.mouse.down();
+
+    const pointerState = await page.evaluate(() => ({
+      down: window.animatorState.pointer?.down ?? false,
+      mode: window.animatorState.pointer?.mode ?? null,
+    }));
+    expect(pointerState.down).toBeTruthy();
+    expect(pointerState.mode).toBe('moving');
+
+    await page.mouse.move(selectionCenter.x + 80, selectionCenter.y + 50, { steps: 12 });
+
+    const movedDuringDrag = await page.evaluate((id) => {
+      const shape = window.animatorState.shapes.find((entry) => entry.id === id);
+      if (!shape) return null;
+      return { x: shape.live.x, y: shape.live.y };
+    }, imageId);
+    expect(movedDuringDrag).not.toBeNull();
+    if (!movedDuringDrag) throw new Error('Image position unavailable during drag');
+    expect(Math.abs(movedDuringDrag.x - initialPosition.x)).toBeGreaterThanOrEqual(40);
+    expect(Math.abs(movedDuringDrag.y - initialPosition.y)).toBeGreaterThanOrEqual(25);
+
+    await page.mouse.up();
+    await page.waitForTimeout(50);
+
+    const movedPosition = await page.evaluate((id) => {
+      const shape = window.animatorState.shapes.find((entry) => entry.id === id);
+      if (!shape) return null;
+      return { x: shape.live.x, y: shape.live.y };
+    }, imageId);
+    expect(movedPosition).not.toBeNull();
+    if (!movedPosition) throw new Error('Image position unavailable');
+    expect(Math.abs(movedPosition.x - initialPosition.x)).toBeGreaterThanOrEqual(40);
+    expect(Math.abs(movedPosition.y - initialPosition.y)).toBeGreaterThanOrEqual(25);
+
+    const boundsBeforeResize = await getShapeBounds(page, imageId);
+    await resizeShapeFromHandle(page, { shapeId: imageId, deltaX: 120, deltaY: 80 });
+    await expect.poll(async () => (await getShapeBounds(page, imageId)).width).toBeGreaterThan(boundsBeforeResize.width);
+    await expect.poll(async () => (await getShapeBounds(page, imageId)).height).toBeGreaterThan(boundsBeforeResize.height);
+
+    const rotationBefore = await page.evaluate((id) => {
+      const shape = window.animatorState.shapes.find((entry) => entry.id === id);
+      return shape?.style?.rotation ?? 0;
+    }, imageId);
+
+    await rotateSelectionFromHandle(page, { shapeId: imageId, sweepDegrees: 90, radius: 140 });
+
+    const rotationAfter = await page.evaluate((id) => {
+      const shape = window.animatorState.shapes.find((entry) => entry.id === id);
+      return shape?.style?.rotation ?? 0;
+    }, imageId);
+
+    expect(Math.abs(rotationAfter - rotationBefore)).toBeGreaterThan(5);
   });
 
   test('image shapes resize via the golden handle', async ({ page }) => {
