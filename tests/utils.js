@@ -30,10 +30,24 @@ async function loadApp(page, { disablePointerEvents = false } = {}) {
   }
 }
 
-async function dispatchPointerEvent(page, type, x, y, { pointerId = 1, pointerType = 'mouse', buttons } = {}) {
+async function dispatchPointerEvent(
+  page,
+  type,
+  x,
+  y,
+  {
+    pointerId = 1,
+    pointerType = 'mouse',
+    buttons,
+    shiftKey = false,
+    ctrlKey = false,
+    metaKey = false,
+    altKey = false,
+  } = {},
+) {
   const resolvedButtons = typeof buttons === 'number' ? buttons : type === 'pointerup' ? 0 : 1;
   await page.evaluate(
-    ({ type, x, y, pointerId, pointerType, buttons: btns }) => {
+    ({ type, x, y, pointerId, pointerType, buttons: btns, shiftKey, ctrlKey, metaKey, altKey }) => {
       const canvas = document.getElementById('stage');
       if (!canvas) throw new Error('Canvas not found');
       const event = new PointerEvent(type, {
@@ -48,17 +62,27 @@ async function dispatchPointerEvent(page, type, x, y, { pointerId = 1, pointerTy
         pageY: y,
         screenX: x,
         screenY: y,
+        shiftKey,
+        ctrlKey,
+        metaKey,
+        altKey,
       });
       canvas.dispatchEvent(event);
     },
-    { type, x, y, pointerId, pointerType, buttons: resolvedButtons },
+    { type, x, y, pointerId, pointerType, buttons: resolvedButtons, shiftKey, ctrlKey, metaKey, altKey },
   );
 }
 
-async function dispatchMouseEvent(page, type, x, y, { buttons } = {}) {
+async function dispatchMouseEvent(
+  page,
+  type,
+  x,
+  y,
+  { buttons, shiftKey = false, ctrlKey = false, metaKey = false, altKey = false } = {},
+) {
   const resolvedButtons = typeof buttons === 'number' ? buttons : type === 'mouseup' ? 0 : 1;
   await page.evaluate(
-    ({ type, x, y, buttons: btns }) => {
+    ({ type, x, y, buttons: btns, shiftKey, ctrlKey, metaKey, altKey }) => {
       const canvas = document.getElementById('stage');
       if (!canvas) throw new Error('Canvas missing');
       const event = new MouseEvent(type, {
@@ -67,10 +91,14 @@ async function dispatchMouseEvent(page, type, x, y, { buttons } = {}) {
         clientX: x,
         clientY: y,
         buttons: btns,
+        shiftKey,
+        ctrlKey,
+        metaKey,
+        altKey,
       });
       canvas.dispatchEvent(event);
     },
-    { type, x, y, buttons: resolvedButtons },
+    { type, x, y, buttons: resolvedButtons, shiftKey, ctrlKey, metaKey, altKey },
   );
 }
 
@@ -211,6 +239,19 @@ async function drawRectangle(page, { offsetX = 0, offsetY = 0, width = 120, heig
   const currentTool = await page.evaluate(() => window.animatorState?.tool ?? 'select');
   if (currentTool !== 'rectangle') {
     await setTool(page, 'rectangle');
+  }
+  const rect = await getCanvasRect(page);
+  const startX = rect.x + rect.width / 2 - width / 2 + offsetX;
+  const startY = rect.y + rect.height / 2 - height / 2 + offsetY;
+  const endX = startX + width;
+  const endY = startY + height;
+  await pointerDrag(page, startX, startY, endX, endY, {});
+}
+
+async function drawDiamond(page, { offsetX = 0, offsetY = 0, width = 120, height = 120 } = {}) {
+  const currentTool = await page.evaluate(() => window.animatorState?.tool ?? 'select');
+  if (currentTool !== 'diamond') {
+    await setTool(page, 'diamond');
   }
   const rect = await getCanvasRect(page);
   const startX = rect.x + rect.width / 2 - width / 2 + offsetX;
@@ -414,6 +455,28 @@ async function bendConnectorFromHandle(page, { shapeId = null, deltaX = 0, delta
   await dispatchPointerEvent(page, 'pointerup', handle.x + deltaX, handle.y + deltaY, {});
 }
 
+async function getLineBendHandlePoint(page, shapeId = null) {
+  return page.evaluate((id) => {
+    const api = window.animatorApi;
+    if (!api) return null;
+    const target = id === null ? undefined : id;
+    return api.getLineBendHandleClientPoint(target) ?? null;
+  }, shapeId ?? null);
+}
+
+async function stagePointToClient(page, point) {
+  if (!point) return null;
+  return page.evaluate(({ x, y }) => {
+    const canvas = document.getElementById('stage');
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: rect.left + x,
+      y: rect.top + y,
+    };
+  }, { x: point.x, y: point.y });
+}
+
 async function getRotationHandleInfo(page, shapeId = null) {
   return page.evaluate((id) => {
     const canvas = document.getElementById('stage');
@@ -459,13 +522,92 @@ async function waitForExportStatus(page, matcher, { timeout = 10000 } = {}) {
   return status;
 }
 
-async function pressShortcut(page, key) {
-  const keyUpper = key.length === 1 ? key.toUpperCase() : key;
+async function pressShortcut(page, key, { shift = false, alt = false } = {}) {
+  const keyUpper = typeof key === 'string' && key.length === 1 ? key.toUpperCase() : key;
+  const keyCode = /^[a-z]$/i.test(keyUpper) ? `Key${keyUpper.toUpperCase()}` : keyUpper;
   const modifier = await page.evaluate(() => {
     const platform = navigator.platform || navigator.userAgent || '';
     return /mac/i.test(platform) ? 'Meta' : 'Control';
   });
-  await page.keyboard.press(`${modifier}+${keyUpper}`);
+  const parts = [modifier];
+  if (shift) parts.push('Shift');
+  if (alt) parts.push('Alt');
+  const chord = `${parts.join('+')}+${keyCode}`;
+  await page.keyboard.press(chord);
+}
+
+async function getGroupHandleClientPoints(page) {
+  return page.evaluate(() => {
+    const canvas = document.getElementById('stage');
+    const state = window.animatorState;
+    const api = window.animatorApi;
+    if (!canvas || !state || !api) return null;
+    const ids = Array.from(state.selectedIds || []);
+    if (ids.length < 2) return null;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    ids.forEach((id) => {
+      const bounds = api.getShapeBounds(id);
+      if (!bounds) return;
+      minX = Math.min(minX, bounds.x);
+      minY = Math.min(minY, bounds.y);
+      maxX = Math.max(maxX, bounds.x + bounds.width);
+      maxY = Math.max(maxY, bounds.y + bounds.height);
+    });
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return null;
+    }
+
+    const bounds = {
+      x: minX,
+      y: minY,
+      width: Math.max(0, maxX - minX),
+      height: Math.max(0, maxY - minY),
+    };
+
+    const rect = canvas.getBoundingClientRect();
+    const stageWidth = state.stage?.width || rect.width;
+    const stageHeight = state.stage?.height || rect.height;
+    const scaleX = rect.width / stageWidth;
+    const scaleY = rect.height / stageHeight;
+    const toClient = (point) => ({
+      x: rect.left + point.x * scaleX,
+      y: rect.top + point.y * scaleY,
+    });
+
+    const centerStage = {
+      x: bounds.x + bounds.width / 2,
+      y: bounds.y + bounds.height / 2,
+    };
+    const resizeStage = {
+      x: bounds.x + bounds.width,
+      y: bounds.y + bounds.height,
+    };
+    const rotationOffset = 36;
+    const rotationStage = {
+      x: centerStage.x,
+      y: bounds.y - rotationOffset,
+    };
+    const rotationAnchorStage = {
+      x: centerStage.x,
+      y: bounds.y,
+    };
+
+    return {
+      bounds,
+      stageCenter: centerStage,
+      center: toClient(centerStage),
+      resizeHandle: toClient(resizeStage),
+      rotationHandle: toClient(rotationStage),
+      rotationAnchor: toClient(rotationAnchorStage),
+      scaleX,
+      scaleY,
+    };
+  });
 }
 
 module.exports = {
@@ -480,6 +622,7 @@ module.exports = {
   setTimelineTime,
   setTool,
   drawRectangle,
+  drawDiamond,
   drawLine,
   createTextShape,
   ensureShapeCount,
@@ -489,8 +632,11 @@ module.exports = {
   getShapeBounds,
   getSelectionClientCenter,
   resizeShapeFromHandle,
+  getGroupHandleClientPoints,
   getConnectorBendHandlePoint,
   bendConnectorFromHandle,
+  getLineBendHandlePoint,
+  stagePointToClient,
   getRotationHandleInfo,
   rotateSelectionFromHandle,
   waitForExportStatus,

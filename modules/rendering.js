@@ -20,6 +20,147 @@ import {
 const measureCanvas = document.createElement("canvas");
 const measureCtx = measureCanvas.getContext("2d");
 const CONNECTOR_BEND_HANDLE_RADIUS = 8;
+const DEFAULT_TEXT_FONT = "Excalifont";
+const RESIZE_HANDLE_SIZE = 10;
+const HANDLE_EDGE_INSET = 4;
+
+const FILL_PATTERN_CACHE = new Map();
+const PATTERN_CANVAS_SIZE = 16;
+const PATTERN_BASE_ALPHA = 0.22;
+const PATTERN_BACKGROUND_ALPHA = 0.12;
+const PATTERN_LINE_ALPHA = 0.6;
+
+function normalizeFillStyle(value) {
+  if (typeof value !== "string") {
+    return "cross-hatch";
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "hachure" || normalized === "hachured") return "hachure";
+  if (normalized === "cross-hatch" || normalized === "crosshatch" || normalized === "cross") return "cross-hatch";
+  if (normalized === "solid") return "solid";
+  return "cross-hatch";
+}
+
+function normalizeEdgeStyle(value) {
+  if (typeof value !== "string") {
+    return "round";
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "round" || normalized === "curved" || normalized === "rounded") {
+    return "round";
+  }
+  if (normalized === "sharp" || normalized === "straight") {
+    return "sharp";
+  }
+  return "round";
+}
+
+function clampUnit(value) {
+  if (!Number.isFinite(value)) return 1;
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  return value;
+}
+
+function getPatternCanvas(fillStyle, color) {
+  const key = `${fillStyle}|${color}`;
+  if (FILL_PATTERN_CACHE.has(key)) {
+    return FILL_PATTERN_CACHE.get(key);
+  }
+  const canvasRef = document.createElement("canvas");
+  canvasRef.width = PATTERN_CANVAS_SIZE;
+  canvasRef.height = PATTERN_CANVAS_SIZE;
+  const patternCtx = canvasRef.getContext("2d");
+  if (!patternCtx) {
+    FILL_PATTERN_CACHE.set(key, null);
+    return null;
+  }
+
+  patternCtx.clearRect(0, 0, canvasRef.width, canvasRef.height);
+  patternCtx.fillStyle = color;
+  patternCtx.globalAlpha = PATTERN_BACKGROUND_ALPHA;
+  patternCtx.fillRect(0, 0, canvasRef.width, canvasRef.height);
+  patternCtx.globalAlpha = PATTERN_LINE_ALPHA;
+  patternCtx.strokeStyle = color;
+  patternCtx.lineWidth = 1;
+  patternCtx.lineCap = "square";
+
+  if (fillStyle === "hachure") {
+    const step = canvasRef.width / 2;
+    patternCtx.beginPath();
+    patternCtx.moveTo(-step, canvasRef.height);
+    patternCtx.lineTo(canvasRef.width, -step);
+    patternCtx.moveTo(0, canvasRef.height);
+    patternCtx.lineTo(canvasRef.width, 0);
+    patternCtx.moveTo(step, canvasRef.height);
+    patternCtx.lineTo(canvasRef.width, step);
+    patternCtx.stroke();
+  } else if (fillStyle === "cross-hatch") {
+    const step = canvasRef.width / 2;
+    patternCtx.beginPath();
+    for (let offset = -canvasRef.width; offset <= canvasRef.width; offset += step) {
+      patternCtx.moveTo(offset, canvasRef.height);
+      patternCtx.lineTo(offset + canvasRef.width, 0);
+      patternCtx.moveTo(offset, 0);
+      patternCtx.lineTo(offset + canvasRef.width, canvasRef.height);
+    }
+    patternCtx.stroke();
+  } else {
+    patternCtx.globalAlpha = 1;
+    FILL_PATTERN_CACHE.set(key, null);
+    return null;
+  }
+
+  patternCtx.globalAlpha = 1;
+  FILL_PATTERN_CACHE.set(key, canvasRef);
+  return canvasRef;
+}
+
+function getFillPattern(context, color, fillStyle) {
+  const canvasRef = getPatternCanvas(fillStyle, color);
+  if (!canvasRef) return null;
+  try {
+    return context.createPattern(canvasRef, "repeat");
+  } catch (error) {
+    return null;
+  }
+}
+
+function fillPathWithStyle(context, style = {}, buildPath) {
+  if (typeof buildPath !== "function") return;
+  const fallbackColor = state.style?.fill || "#ff6b6b";
+  const rawColor = typeof style.fill === "string" && style.fill.trim() !== ""
+    ? style.fill
+    : fallbackColor;
+  const resolvedStyle = normalizeFillStyle(style.fillStyle ?? state.style?.fillStyle ?? "cross-hatch");
+
+  if (resolvedStyle === "solid" || rawColor === "transparent") {
+    buildPath();
+    context.fillStyle = rawColor;
+    context.fill();
+    return;
+  }
+
+  const opacity = clampUnit(typeof style.opacity === "number" ? style.opacity : state.style?.opacity ?? 1);
+
+  buildPath();
+  context.save();
+  context.fillStyle = rawColor;
+  context.globalAlpha = opacity * PATTERN_BASE_ALPHA;
+  context.fill();
+  context.restore();
+
+  const pattern = getFillPattern(context, rawColor, resolvedStyle);
+  if (pattern) {
+    buildPath();
+    context.fillStyle = pattern;
+    context.fill();
+  } else {
+    buildPath();
+    context.fillStyle = rawColor;
+    context.fill();
+  }
+}
 
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
@@ -104,6 +245,9 @@ function drawShape(context, shape) {
     case "square":
       drawRectangleShape(context, shape, strokeWidth);
       break;
+    case "diamond":
+      drawDiamondShape(context, shape, strokeWidth);
+      break;
     case "circle":
       drawCircleShape(context, shape, strokeWidth);
       break;
@@ -130,34 +274,78 @@ function drawShape(context, shape) {
 
 function drawRectangleShape(context, shape, strokeWidth) {
   const { live, style = {} } = shape;
-  const edgeStyle = style.edgeStyle || state.style.edgeStyle || "curved";
-  const radius = edgeStyle === "curved" ? 12 : 0;
+  const edgeStyle = normalizeEdgeStyle(style.edgeStyle || state.style.edgeStyle);
+  const width = Math.abs(live.width || 0);
+  const height = Math.abs(live.height || 0);
+  const left = live.width >= 0 ? live.x : live.x - width;
+  const top = live.height >= 0 ? live.y : live.y - height;
+  const right = left + width;
+  const bottom = top + height;
+  const minDimension = Math.max(0, Math.min(width, height));
+  const radius = edgeStyle === "round" && minDimension > 0 ? Math.min(Math.max(minDimension * 0.25, 8), minDimension / 2) : 0;
 
-  context.beginPath();
-  if (radius > 0 && typeof context.roundRect === "function") {
-    context.roundRect(live.x, live.y, live.width, live.height, radius);
-  } else if (radius > 0) {
-    traceRoundedRectPath(context, live.x, live.y, live.width, live.height, radius);
-    context.closePath();
-  } else {
-    context.rect(live.x, live.y, live.width, live.height);
-  }
+  context.lineJoin = edgeStyle === "round" ? "round" : "miter";
+  context.lineCap = edgeStyle === "round" ? "round" : "butt";
 
-  context.fill();
+  const buildPath = () => {
+    context.beginPath();
+    if (radius > 0 && typeof context.roundRect === "function") {
+      context.roundRect(left, top, width, height, radius);
+    } else if (radius > 0) {
+      traceRoundedRectPath(context, left, top, width, height, radius);
+      context.closePath();
+    } else {
+      context.rect(left, top, width, height);
+    }
+  };
+
+  fillPathWithStyle(context, style, buildPath);
   if (strokeWidth > 0) {
+    buildPath();
     context.stroke();
-    drawSloppyOutline(
-      context,
-      [
-        { x: live.x, y: live.y },
-        { x: live.x + live.width, y: live.y },
-        { x: live.x + live.width, y: live.y + live.height },
-        { x: live.x, y: live.y + live.height },
-      ],
-      style,
-      shape.id,
-      true,
-    );
+
+    const outlinePoints = radius > 0
+      ? buildRoundedRectOutlinePoints(left, top, width, height, radius)
+      : [
+          { x: left, y: top },
+          { x: right, y: top },
+          { x: right, y: bottom },
+          { x: left, y: bottom },
+        ];
+
+    if (outlinePoints.length >= 3) {
+      drawSloppyOutline(context, outlinePoints, style, shape.id, true);
+    }
+  }
+}
+
+function drawDiamondShape(context, shape, strokeWidth) {
+  const { live, style = {} } = shape;
+  const centerX = live.x + live.width / 2;
+  const centerY = live.y + live.height / 2;
+  const halfWidth = live.width / 2;
+  const halfHeight = live.height / 2;
+  const points = [
+    { x: centerX, y: centerY - halfHeight },
+    { x: centerX + halfWidth, y: centerY },
+    { x: centerX, y: centerY + halfHeight },
+    { x: centerX - halfWidth, y: centerY },
+  ];
+
+  const buildPath = () => {
+    context.beginPath();
+    context.moveTo(points[0].x, points[0].y);
+    for (let index = 1; index < points.length; index += 1) {
+      context.lineTo(points[index].x, points[index].y);
+    }
+    context.closePath();
+  };
+
+  fillPathWithStyle(context, style, buildPath);
+  if (strokeWidth > 0) {
+    buildPath();
+    context.stroke();
+    drawSloppyOutline(context, points, style, shape.id, true);
   }
 }
 
@@ -168,10 +356,15 @@ function drawCircleShape(context, shape, strokeWidth) {
   const centerX = live.x + Math.sign(live.width || 1) * radiusX;
   const centerY = live.y + Math.sign(live.height || 1) * radiusY;
 
-  context.beginPath();
-  context.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-  context.fill();
+  const buildPath = () => {
+    context.beginPath();
+    context.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
+    context.closePath();
+  };
+
+  fillPathWithStyle(context, style, buildPath);
   if (strokeWidth > 0) {
+    buildPath();
     context.stroke();
     drawSloppyEllipse(context, centerX, centerY, radiusX, radiusY, style, shape.id);
   }
@@ -224,8 +417,8 @@ function drawConnectorShape(context, shape, strokeWidth) {
   const end = applyJitter(live.end, style, `${shape.id}:end`);
   const sloppinessAmplitude = getSloppinessAmplitude(style);
   const bend = clamp(typeof style.bend === "number" ? style.bend : state.style.bend || 0, -100, 100);
-  const edgeStyle = style.edgeStyle || state.style.edgeStyle || "curved";
-  const useCurved = edgeStyle === "curved" || Math.abs(bend) > 0.1;
+  const edgeStyle = normalizeEdgeStyle(style.edgeStyle || state.style.edgeStyle);
+  const useCurved = edgeStyle === "round" || Math.abs(bend) > 0.1;
 
   context.beginPath();
   context.moveTo(start.x, start.y);
@@ -363,6 +556,43 @@ function traceRoundedRectPath(context, x, y, width, height, radius) {
   context.quadraticCurveTo(x, y, x + r, y);
 }
 
+function buildRoundedRectOutlinePoints(x, y, width, height, radius) {
+  const points = [];
+  if (radius <= 0 || width <= 0 || height <= 0) {
+    return points;
+  }
+
+  const left = x;
+  const right = x + width;
+  const top = y;
+  const bottom = y + height;
+  const segments = Math.max(4, Math.ceil(radius / 4));
+
+  const pushPoint = (px, py) => {
+    points.push({ x: px, y: py });
+  };
+
+  const pushArc = (cx, cy, startAngle, endAngle) => {
+    for (let index = 1; index <= segments; index += 1) {
+      const t = index / segments;
+      const angle = startAngle + (endAngle - startAngle) * t;
+      pushPoint(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+    }
+  };
+
+  pushPoint(right - radius, top);
+  pushPoint(left + radius, top);
+  pushArc(left + radius, top + radius, -Math.PI / 2, -Math.PI);
+  pushPoint(left, bottom - radius);
+  pushArc(left + radius, bottom - radius, Math.PI, Math.PI / 2);
+  pushPoint(right - radius, bottom);
+  pushArc(right - radius, bottom - radius, Math.PI / 2, 0);
+  pushPoint(right, top + radius);
+  pushArc(right - radius, top + radius, 0, -Math.PI / 2);
+
+  return points;
+}
+
 function applyJitter(point, style, seed) {
   const amplitude = getSloppinessAmplitude(style);
   if (amplitude <= 0 || !point) return point;
@@ -429,12 +659,12 @@ function computeConnectorControlData(start, end, style = {}, seed, overrideBend 
   const bendValue = clamp(typeof bendSource === "number" ? bendSource : fallbackBend, -100, 100);
   const bendNormalized = bendValue / 100;
 
-  const edgeStyle = style?.edgeStyle || state.style.edgeStyle || "curved";
-  const baseFactor = edgeStyle === "curved" ? 0.2 : 0;
+  const edgeStyle = normalizeEdgeStyle(style?.edgeStyle || state.style.edgeStyle);
+  const baseFactor = edgeStyle === "round" ? 0.2 : 0;
   const baseOffset = length * baseFactor;
 
   const sloppiness = getSloppinessAmplitude(style) * 1.5;
-  const jitterAmplitude = edgeStyle === "curved" ? length * 0.05 + sloppiness * 0.6 : 0;
+  const jitterAmplitude = edgeStyle === "round" ? length * 0.05 + sloppiness * 0.6 : 0;
   const jitter = jitterAmplitude !== 0 ? jitterValue(`${seed}:bend`, jitterAmplitude) : 0;
 
   const bendOffset = bendNormalized * length * 0.6;
@@ -539,7 +769,7 @@ function drawSelectionBounds(context) {
     }
 
     if (bounds.width > 0 || bounds.height > 0) {
-      drawResizeHandle(context, bounds.x + bounds.width, bounds.y + bounds.height);
+      drawResizeHandle(context, bounds);
     }
 
     if (isConnectorShape(shape)) {
@@ -549,7 +779,7 @@ function drawSelectionBounds(context) {
     if (canRotateShape(shape)) {
       drawRotationHandle(context, shape, bounds);
     }
-  } else {
+  } else if (selected.length > 1) {
     const bounds = getSelectionBounds(selected);
     context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
   }
@@ -576,7 +806,16 @@ function drawMarqueeSelection(context) {
   context.restore();
 }
 
-function drawResizeHandle(context, x, y) {
+function getStageDimensions() {
+  const width = Number.isFinite(state.stage?.width) ? state.stage.width : canvas?.width || 0;
+  const height = Number.isFinite(state.stage?.height) ? state.stage.height : canvas?.height || 0;
+  return { width, height };
+}
+
+function drawResizeHandle(context, bounds) {
+  if (!bounds) return;
+  const x = bounds.x + bounds.width;
+  const y = bounds.y + bounds.height;
   const size = 10;
   context.save();
   context.setLineDash([]);
@@ -589,6 +828,16 @@ function drawResizeHandle(context, x, y) {
   context.stroke();
   context.restore();
 }
+
+function getResizeHandleCenter(bounds) {
+  if (!bounds) return null;
+  return {
+    x: bounds.x + bounds.width,
+    y: bounds.y + bounds.height,
+  };
+}
+
+
 
 function drawConnectorBendHandle(context, shape) {
   const geometry = getConnectorBendGeometry(shape);
@@ -628,31 +877,11 @@ function hitConnectorBendHandle(shape, point) {
   return distance(point, geometry.control) <= radius;
 }
 
-function drawRotationHandle(context, shape, bounds) {
-  const handle = getRotationHandleCenter(shape, bounds);
-  if (!handle) return;
-  context.save();
-  context.setLineDash([]);
-  context.strokeStyle = "#facc15";
-  context.fillStyle = "#facc15";
-  context.lineWidth = 2;
-  context.beginPath();
-  context.moveTo(handle.x, bounds.y);
-  context.lineTo(handle.x, handle.y - ROTATION_HANDLE_RADIUS);
-  context.stroke();
 
-  context.beginPath();
-  context.arc(handle.x, handle.y, ROTATION_HANDLE_RADIUS, 0, Math.PI * 2);
-  context.fill();
-  context.strokeStyle = "#111827";
-  context.lineWidth = 1.5;
-  context.stroke();
-  context.restore();
-}
 
 function getFontSettings(style = {}) {
   const fallbackSize = Number(state?.style?.fontSize) || 32;
-  const fallbackFamily = state?.style?.fontFamily || "Inter";
+  const fallbackFamily = state?.style?.fontFamily || DEFAULT_TEXT_FONT;
   const fontSize = Math.max(8, Math.min(200, Number(style.fontSize) || fallbackSize));
   const fontFamily = style.fontFamily || fallbackFamily;
   return {
@@ -678,13 +907,13 @@ function hitResizeHandle(shape, point) {
   if (!shape || !point) return false;
   const bounds = getShapeBounds(shape);
   if (!Number.isFinite(bounds.x) || !Number.isFinite(bounds.y)) return false;
+  const center = getResizeHandleCenter(bounds);
+  if (!center) return false;
   const handleSize = 12;
-  const handleX = bounds.x + bounds.width;
-  const handleY = bounds.y + bounds.height;
   const half = handleSize / 2;
   const handle = {
-    x: handleX - half,
-    y: handleY - half,
+    x: center.x - half,
+    y: center.y - half,
     width: handleSize,
     height: handleSize,
   };
@@ -696,20 +925,42 @@ function hitResizeHandle(shape, point) {
   );
 }
 
+function drawRotationHandle(context, shape, bounds) {
+  if (!canRotateShape(shape)) return;
+  const center = getShapeCenter(shape);
+  if (!center) return;
+  
+  context.save();
+  context.setLineDash([]);
+  
+  // Draw rotation indicator circle (larger, semi-transparent)
+  context.strokeStyle = "#60a5fa";
+  context.lineWidth = 2;
+  context.globalAlpha = 0.3;
+  context.beginPath();
+  context.arc(center.x, center.y, 12, 0, Math.PI * 2);
+  context.stroke();
+  
+  // Draw rotation handle (yellow dot in center)
+  context.globalAlpha = 1;
+  context.fillStyle = "#facc15";
+  context.strokeStyle = "#111827";
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.arc(center.x, center.y, ROTATION_HANDLE_RADIUS, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.restore();
+}
+
 function getRotationHandleCenter(shape, bounds = null) {
   if (!canRotateShape(shape)) return null;
-  const workingBounds = bounds || getShapeBounds(shape);
-  if (!workingBounds) return null;
-  return {
-    x: workingBounds.x + workingBounds.width / 2,
-    y: workingBounds.y - ROTATION_HANDLE_OFFSET,
-  };
+  return getShapeCenter(shape);
 }
 
 function hitRotationHandle(shape, point) {
   if (!shape || !canRotateShape(shape)) return false;
-  const bounds = getShapeBounds(shape);
-  const center = getRotationHandleCenter(shape, bounds);
+  const center = getRotationHandleCenter(shape);
   if (!center) return false;
   const radius = ROTATION_HANDLE_RADIUS + 4;
   return distance(point, center) <= radius;

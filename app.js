@@ -1,5 +1,39 @@
 import { encodeGif } from "./gifEncoder.js";
 
+const DEFAULT_FILL_STYLE = "cross-hatch";
+const DEFAULT_EDGE_STYLE = "round";
+const DEFAULT_STROKE_STYLE = "solid";
+const DEFAULT_TEXT_FONT = "Excalifont";
+
+const FILL_STYLE_VALUES = new Set(["solid", "cross-hatch", "hachure"]);
+const EDGE_STYLE_VALUES = new Set(["sharp", "round"]);
+const STROKE_STYLE_VALUES = new Set(["solid", "dashed", "dotted"]);
+
+const TOOLBAR_COLLAPSED_STORAGE_KEY = "animator.toolbar.collapsed";
+const TOOL_MENU_COLLAPSED_STORAGE_KEY = "animator.toolMenu.collapsed";
+const STAGE_BACKGROUND_STORAGE_KEY = "animator.stage.background";
+const STAGE_SIZE_STORAGE_KEY = "animator.stage.size";
+const TIPS_DISMISSED_KEY = "animator.tips.dismissed.items";
+const LEGACY_TIPS_KEY = "animator.tips.dismissed";
+
+const TIPS_CONTENT = [
+  { id: "place-shapes", text: "Click the canvas to place shapes." },
+  {
+    id: "move-resize",
+    text: "With a shape selected, drag to move or pull the corner handle to resize.",
+  },
+  { id: "timeline", text: "Use the timeline to set keyframes for smooth animations." },
+  { id: "arrow-tool", text: "Arrow tool can draw connectors with customizable endings." },
+];
+
+const DEFAULT_STAGE_BACKGROUND =
+  getComputedStyle(document.documentElement).getPropertyValue("--canvas-bg")?.trim() || "#ffffff";
+const STROKE_WIDTH_DEFAULT_RANGE = { min: 1, max: 12 };
+const STROKE_WIDTH_PEN_RANGE = { min: 1, max: 24 };
+
+const TIMELINE_DEFAULT_DURATION = 5;
+const HISTORY_LIMIT = 100;
+
 const canvas = document.getElementById("stage");
 const ctx = canvas.getContext("2d");
 
@@ -12,15 +46,25 @@ const elements = {
   strokeColor: document.getElementById("strokeColor"),
   strokeWidth: document.getElementById("strokeWidth"),
   strokeWidthValue: document.getElementById("strokeWidthValue"),
+  strokeStyleButtons: Array.from(document.querySelectorAll("[data-stroke-style]")),
+  strokeStyleControl: document.getElementById("strokeStyleControl"),
   sketchButtons: Array.from(document.querySelectorAll("[data-sketch-level]")),
+  sketchControl: document.getElementById("sketchControl"),
+  fillStyleButtons: Array.from(document.querySelectorAll("[data-fill-style]")),
+  fillStyleControl: document.getElementById("fillStyleControl"),
+  edgeStyleButtons: Array.from(document.querySelectorAll("[data-edge-style]")),
+  edgeStyleControl: document.getElementById("edgeStyleControl"),
+  opacity: document.getElementById("opacity"),
+  opacityValue: document.getElementById("opacityValue"),
   fontFamily: document.getElementById("fontFamily"),
+  fontFamilyControl: document.getElementById("fontFamily")?.closest(".control") || document.getElementById("fontFamily"),
   arrowToggleButtons: Array.from(document.querySelectorAll("[data-arrow-toggle]")),
   arrowEndingControl: document.getElementById("arrowEndingControl"),
   marqueeOverlay: document.getElementById("marqueeOverlay"),
   selectionLabel: document.getElementById("selectionLabel"),
   keyframeList: document.getElementById("keyframeList"),
   timelineTrack: document.getElementById("timelineTrack"),
-  timelineMarker: document.getElementById("timelineMarker"),
+  timelineMarker: document.querySelector(".timeline-marker"),
   timelineRange: document.getElementById("timelineRange"),
   timelineDuration: document.getElementById("timelineDuration"),
   currentTime: document.getElementById("currentTime"),
@@ -51,42 +95,15 @@ const elements = {
   stageDimensions: document.getElementById("stageDimensions"),
   stageResizeHandle: document.getElementById("stageResizeHandle"),
   stageResizeHandles: Array.from(document.querySelectorAll("[data-stage-resize]")),
+  appShell: document.querySelector(".app-shell"),
+  toolbarToggles: Array.from(document.querySelectorAll("[data-toolbar-toggle]")),
+  toolbar: document.querySelector(".toolbar"),
+  floatingToolMenu: document.querySelector(".floating-tool-menu"),
+  toolMenuToggle: document.querySelector("[data-tool-menu-toggle]"),
 };
-
-const DEFAULT_STAGE_BACKGROUND =
-  getComputedStyle(document.documentElement).getPropertyValue("--canvas-bg")?.trim() || "#ffffff";
-const STAGE_BACKGROUND_STORAGE_KEY = "animator.stage.background";
-const STROKE_WIDTH_DEFAULT_RANGE = { min: 1, max: 12 };
-const STROKE_WIDTH_PEN_RANGE = { min: 1, max: 24 };
-
-const findArrowToggleButton = (key) =>
-  elements.arrowToggleButtons.find((button) => button.getAttribute("data-arrow-toggle") === key) || null;
-
-const isButtonPressed = (button) => button?.getAttribute("aria-pressed") === "true";
-
-const getInitialSketchLevel = () => {
-  const active = elements.sketchButtons.find((button) => isButtonPressed(button));
-  return active ? Number(active.getAttribute("data-sketch-level")) || 0 : 0;
-};
-
-const getInitialArrowState = (key, fallback = false) => {
-  const button = findArrowToggleButton(key);
-  return button ? isButtonPressed(button) : fallback;
-};
-
-const TIPS_DISMISSED_KEY = "animator.tips.dismissed.items";
-const LEGACY_TIPS_KEY = "animator.tips.dismissed";
-const TIPS_CONTENT = [
-  { id: "place-shapes", text: "Click the canvas to place shapes." },
-  {
-    id: "move-resize",
-    text: "With a shape selected, drag to move or pull the corner handle to resize.",
-  },
-  { id: "timeline", text: "Use the timeline to set keyframes for smooth animations." },
-  { id: "arrow-tool", text: "Arrow tool can draw connectors with customizable endings." },
-];
 
 const FONT_FALLBACKS = {
+  Excalifont: "sans-serif",
   Inter: "sans-serif",
   Poppins: "sans-serif",
   Roboto: "sans-serif",
@@ -111,17 +128,110 @@ const FONT_FALLBACKS = {
 };
 
 function getFontStack(fontFamily) {
-  const family = fontFamily || "Inter";
+  const family = fontFamily || DEFAULT_TEXT_FONT;
   const fallback = FONT_FALLBACKS[family] || "sans-serif";
   const sanitized = family.replace(/"/g, '\\"');
   return `"${sanitized}", ${fallback}`;
 }
 
-const STAGE_SIZE_STORAGE_KEY = "animator.stage.size";
+const findArrowToggleButton = (key) =>
+  elements.arrowToggleButtons.find((button) => button.getAttribute("data-arrow-toggle") === key) || null;
+
+const isButtonPressed = (button) => button?.getAttribute("aria-pressed") === "true";
+
+const getInitialSketchLevel = () => {
+  const active = elements.sketchButtons.find((button) => isButtonPressed(button));
+  return active ? Number(active.getAttribute("data-sketch-level")) || 0 : 0;
+};
+
+const getInitialArrowState = (key, fallback = false) => {
+  const button = findArrowToggleButton(key);
+  return button ? isButtonPressed(button) : fallback;
+};
+
+const getInitialStrokeStyle = () => {
+  const active = elements.strokeStyleButtons?.find((button) => isButtonPressed(button));
+  return active?.getAttribute("data-stroke-style") || DEFAULT_STROKE_STYLE;
+};
+
+const getInitialFillStyle = () => {
+  const active = elements.fillStyleButtons?.find((button) => isButtonPressed(button));
+  return active?.getAttribute("data-fill-style") || DEFAULT_FILL_STYLE;
+};
+
+const getInitialEdgeStyle = () => {
+  const active = elements.edgeStyleButtons?.find((button) => isButtonPressed(button));
+  return active?.getAttribute("data-edge-style") || DEFAULT_EDGE_STYLE;
+};
+
 let dismissedTips = new Set();
 
-const TIMELINE_DEFAULT_DURATION = 5;
-const HISTORY_LIMIT = 100;
+function normalizeFillStyle(value, fallback = DEFAULT_FILL_STYLE) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (FILL_STYLE_VALUES.has(normalized)) {
+    return normalized;
+  }
+  if (normalized === "crosshatch" || normalized === "cross") {
+    return "cross-hatch";
+  }
+  if (normalized === "hachured") {
+    return "hachure";
+  }
+  return fallback;
+}
+
+function normalizeEdgeStyle(value, fallback = DEFAULT_EDGE_STYLE) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (EDGE_STYLE_VALUES.has(normalized)) {
+    return normalized;
+  }
+  if (normalized === "curved" || normalized === "rounded") {
+    return "round";
+  }
+  if (normalized === "straight") {
+    return "sharp";
+  }
+  return fallback;
+}
+
+function normalizeStrokeStyle(value, fallback = DEFAULT_STROKE_STYLE) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (STROKE_STYLE_VALUES.has(normalized)) {
+    return normalized;
+  }
+  if (normalized === "dash" || normalized === "dashes") {
+    return "dashed";
+  }
+  if (normalized === "dot" || normalized === "dots") {
+    return "dotted";
+  }
+  return fallback;
+}
+
+function ensureStyleHasFillStyle(style, shapeType) {
+  if (!style || typeof style !== "object") {
+    return;
+  }
+  style.strokeStyle = normalizeStrokeStyle(style.strokeStyle ?? state?.style?.strokeStyle ?? DEFAULT_STROKE_STYLE);
+  const isConnector = shapeType === "line" || shapeType === "arrow";
+  if (isConnector) {
+    delete style.fillStyle;
+    delete style.edgeStyle;
+    style.sketchLevel = 0;
+    return;
+  }
+  style.fillStyle = normalizeFillStyle(style.fillStyle ?? state?.style?.fillStyle ?? DEFAULT_FILL_STYLE);
+  style.edgeStyle = normalizeEdgeStyle(style.edgeStyle ?? state?.style?.edgeStyle ?? DEFAULT_EDGE_STYLE);
+}
 
 const state = {
   tool: "select",
@@ -129,19 +239,23 @@ const state = {
   selection: null,
   selectedIds: new Set(),
   hoverHandle: null,
+  toolbarCollapsed: false,
+  toolMenuCollapsed: false,
   style: {
     fill: elements.fillColor.value,
+    fillStyle: normalizeFillStyle(getInitialFillStyle(), DEFAULT_FILL_STYLE),
     stroke: elements.strokeColor.value,
     strokeWidth: Number(elements.strokeWidth.value),
+    strokeStyle: normalizeStrokeStyle(getInitialStrokeStyle(), DEFAULT_STROKE_STYLE),
     sketchLevel: getInitialSketchLevel(),
     arrowStart: getInitialArrowState("start", false),
     arrowEnd: getInitialArrowState("end", true),
-    opacity: 1,
-    edgeStyle: "curved",
+    opacity: elements.opacity ? Number(elements.opacity.value) / 100 : 1,
+    edgeStyle: normalizeEdgeStyle(getInitialEdgeStyle(), DEFAULT_EDGE_STYLE),
     sloppiness: "neat",
     bend: 0,
     rotation: 0,
-    fontFamily: elements.fontFamily?.value || "Inter",
+    fontFamily: elements.fontFamily?.value || DEFAULT_TEXT_FONT,
     fontSize: 32,
   },
   stage: {
@@ -167,6 +281,8 @@ const state = {
     bounce: false,
     direction: 1,
     exportFps: elements.exportFps ? Number(elements.exportFps.value) || 12 : 12,
+    selectedKeyframeTime: null,
+    selectedKeyframeShapeId: null,
   },
   pointer: {
     down: false,
@@ -183,10 +299,17 @@ const state = {
     startHandleVector: null,
     startStyle: null,
     multiSnapshot: null,
+    multiStyles: null,
     marquee: null,
     marqueeAppend: false,
     usingPointerEvents: false,
     touchIdentifier: null,
+  },
+  modifiers: {
+    shift: false,
+    ctrl: false,
+    meta: false,
+    alt: false,
   },
   history: {
     undoStack: [],
@@ -202,6 +325,179 @@ const state = {
   activeGroupId: null,
   activeGroup: null,
 };
+
+ensureStyleHasFillStyle(state.style);
+
+function loadToolbarCollapsedPreference() {
+  try {
+    const stored = window.localStorage?.getItem(TOOLBAR_COLLAPSED_STORAGE_KEY);
+    if (stored === "1" || stored === "true") {
+      return true;
+    }
+    if (stored === "0" || stored === "false") {
+      return false;
+    }
+  } catch (error) {
+    console.warn("Failed to read toolbar collapse preference", error);
+  }
+  return null;
+}
+
+function saveToolbarCollapsedPreference(collapsed) {
+  try {
+    window.localStorage?.setItem(TOOLBAR_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch (error) {
+    console.warn("Failed to persist toolbar collapse preference", error);
+  }
+}
+
+function applyToolbarCollapsedState({ scheduleResize = false } = {}) {
+  const collapsed = Boolean(state.toolbarCollapsed);
+
+  if (elements.appShell) {
+    elements.appShell.classList.toggle("toolbar-collapsed", collapsed);
+  }
+
+  const label = collapsed ? "Show the toolbar" : "Hide the toolbar";
+  const stateValue = collapsed ? "collapsed" : "expanded";
+  if (Array.isArray(elements.toolbarToggles)) {
+    elements.toolbarToggles.forEach((button) => {
+      if (!button) return;
+      button.setAttribute("aria-pressed", collapsed ? "true" : "false");
+      button.setAttribute("aria-label", label);
+      button.title = label;
+      button.dataset.toolbarState = stateValue;
+    });
+  }
+
+  if (elements.toolbar) {
+    elements.toolbar.setAttribute("aria-hidden", collapsed ? "true" : "false");
+  }
+
+  if (scheduleResize) {
+    window.requestAnimationFrame(() => {
+      resizeCanvas();
+    });
+  }
+}
+
+function loadToolMenuCollapsedPreference() {
+  try {
+    const stored = window.localStorage?.getItem(TOOL_MENU_COLLAPSED_STORAGE_KEY);
+    if (stored === "1" || stored === "true") {
+      return true;
+    }
+    if (stored === "0" || stored === "false") {
+      return false;
+    }
+  } catch (error) {
+    console.warn("Failed to read tool menu collapse preference", error);
+  }
+  return null;
+}
+
+function saveToolMenuCollapsedPreference(collapsed) {
+  try {
+    window.localStorage?.setItem(TOOL_MENU_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
+  } catch (error) {
+    console.warn("Failed to persist tool menu collapse preference", error);
+  }
+}
+
+function applyToolMenuCollapsedState({ scheduleResize = false } = {}) {
+  const collapsed = Boolean(state.toolMenuCollapsed);
+
+  if (elements.canvasWrapper) {
+    elements.canvasWrapper.classList.toggle("tool-menu-collapsed", collapsed);
+  }
+
+  if (elements.floatingToolMenu) {
+    elements.floatingToolMenu.dataset.collapsed = collapsed ? "true" : "false";
+    elements.floatingToolMenu.setAttribute("aria-hidden", "false");
+  }
+
+  if (elements.toolMenuToggle) {
+    const label = collapsed ? "Show canvas tools" : "Hide canvas tools";
+    const stateValue = collapsed ? "collapsed" : "expanded";
+    elements.toolMenuToggle.setAttribute("aria-pressed", collapsed ? "true" : "false");
+    elements.toolMenuToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    elements.toolMenuToggle.setAttribute("aria-label", label);
+    elements.toolMenuToggle.title = label;
+    elements.toolMenuToggle.dataset.toolMenuState = stateValue;
+  }
+
+  if (scheduleResize) {
+    window.requestAnimationFrame(() => {
+      resizeCanvas();
+    });
+  }
+}
+
+function setToolbarCollapsed(nextCollapsed, { persist = true, force = false, scheduleResize = true } = {}) {
+  const collapsed = Boolean(nextCollapsed);
+  const changed = collapsed !== state.toolbarCollapsed;
+
+  if (!changed && !force) {
+    return;
+  }
+
+  state.toolbarCollapsed = collapsed;
+  applyToolbarCollapsedState({ scheduleResize: scheduleResize && changed });
+
+  if (persist && changed) {
+    saveToolbarCollapsedPreference(collapsed);
+  }
+}
+
+function toggleToolbarVisibility(event) {
+  if (event) {
+    event.preventDefault();
+  }
+  setToolbarCollapsed(!state.toolbarCollapsed);
+}
+
+function restoreToolbarCollapsedPreference() {
+  const stored = loadToolbarCollapsedPreference();
+  if (typeof stored === "boolean") {
+    setToolbarCollapsed(stored, { persist: false, force: true, scheduleResize: false });
+  } else {
+    applyToolbarCollapsedState({ scheduleResize: false });
+  }
+}
+
+function setToolMenuCollapsed(nextCollapsed, { persist = true, force = false, scheduleResize = true } = {}) {
+  const collapsed = Boolean(nextCollapsed);
+  const changed = collapsed !== state.toolMenuCollapsed;
+
+  if (!changed && !force) {
+    return;
+  }
+
+  state.toolMenuCollapsed = collapsed;
+  applyToolMenuCollapsedState({ scheduleResize: scheduleResize && (changed || force) });
+
+  if (persist && changed) {
+    saveToolMenuCollapsedPreference(collapsed);
+  }
+}
+
+function toggleToolMenuVisibility(event) {
+  if (event) {
+    event.preventDefault();
+  }
+  setToolMenuCollapsed(!state.toolMenuCollapsed);
+}
+
+function restoreToolMenuCollapsedPreference() {
+  const stored = loadToolMenuCollapsedPreference();
+  if (typeof stored === "boolean") {
+    setToolMenuCollapsed(stored, { persist: false, force: true, scheduleResize: false });
+  } else {
+    applyToolMenuCollapsedState({ scheduleResize: false });
+  }
+}
+
+ensureStyleHasFillStyle(state.style);
 
 let shapeIdCounter = 1;
 let groupIdCounter = 1;
@@ -246,6 +542,16 @@ function cloneShapeForHistory(shape) {
     isVisible: shape.isVisible !== false,
   };
 
+  ensureStyleHasFillStyle(clone.style, clone.type);
+  if (Array.isArray(clone.keyframes)) {
+    clone.keyframes.forEach((keyframe) => {
+      if (keyframe && keyframe.snapshot && keyframe.snapshot.style) {
+        const snapshotType = keyframe.snapshot.type ?? clone.type;
+        ensureStyleHasFillStyle(keyframe.snapshot.style, snapshotType);
+      }
+    });
+  }
+
   if (shape.groupId) {
     clone.groupId = shape.groupId;
   }
@@ -276,6 +582,16 @@ function reviveShapeFromHistory(data) {
     birthTime: data.birthTime ?? 0,
     isVisible: data.isVisible !== false,
   };
+
+  ensureStyleHasFillStyle(shape.style, shape.type);
+  if (Array.isArray(shape.keyframes)) {
+    shape.keyframes.forEach((keyframe) => {
+      if (keyframe && keyframe.snapshot && keyframe.snapshot.style) {
+        const snapshotType = keyframe.snapshot.type ?? shape.type;
+        ensureStyleHasFillStyle(keyframe.snapshot.style, snapshotType);
+      }
+    });
+  }
 
   if (data.groupId) {
     shape.groupId = data.groupId;
@@ -314,6 +630,7 @@ function cloneStateSnapshot() {
       bounce: state.timeline.bounce,
       exportFps: state.timeline.exportFps,
       selectedKeyframeTime: state.timeline.selectedKeyframeTime ?? null,
+      selectedKeyframeShapeId: state.timeline.selectedKeyframeShapeId ?? null,
     },
     shapeIdCounter,
     groupIdCounter,
@@ -413,6 +730,9 @@ function restoreHistorySnapshot(snapshot) {
   state.timeline.selectedKeyframeTime = Number.isFinite(timeline.selectedKeyframeTime)
     ? timeline.selectedKeyframeTime
     : null;
+  state.timeline.selectedKeyframeShapeId = Number.isFinite(timeline.selectedKeyframeShapeId)
+    ? timeline.selectedKeyframeShapeId
+    : null;
   state.timeline.lastTick = null;
   state.timeline.isPlaying = false;
   state.timeline.direction = 1;
@@ -472,6 +792,8 @@ const KEYFRAME_EPSILON = 0.001;
 const MARQUEE_EPSILON = 0.5;
 
 function init() {
+  restoreToolbarCollapsedPreference();
+  restoreToolMenuCollapsedPreference();
   resizeCanvas();
   bindEvents();
   initializeTipsPanel();
@@ -598,6 +920,16 @@ function bindEvents() {
     }
   });
 
+  if (Array.isArray(elements.toolbarToggles)) {
+    elements.toolbarToggles.forEach((button) => {
+      button.addEventListener("click", toggleToolbarVisibility);
+    });
+  }
+
+  if (elements.toolMenuToggle) {
+    elements.toolMenuToggle.addEventListener("click", toggleToolMenuVisibility);
+  }
+
   elements.toolButtons.forEach((button) => {
     button.addEventListener("click", () => {
       setTool(button.dataset.tool);
@@ -611,6 +943,42 @@ function bindEvents() {
       commitShapeChange(state.selection);
     }
   });
+
+  if (Array.isArray(elements.fillStyleButtons) && elements.fillStyleButtons.length > 0) {
+    elements.fillStyleButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const value = button.getAttribute("data-fill-style");
+        if (!value) return;
+        applyFillStyle(value);
+      });
+    });
+  }
+
+  if (Array.isArray(elements.edgeStyleButtons) && elements.edgeStyleButtons.length > 0) {
+    elements.edgeStyleButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const value = button.getAttribute("data-edge-style");
+        if (!value) return;
+        applyEdgeStyle(value);
+      });
+    });
+  }
+
+  if (elements.opacity) {
+    elements.opacity.addEventListener("input", (event) => {
+      const raw = Number(event.target.value);
+      const clamped = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : 100;
+      const normalized = clamped / 100;
+      state.style.opacity = normalized;
+      if (elements.opacityValue) {
+        elements.opacityValue.textContent = `${Math.round(clamped)}%`;
+      }
+      if (state.selection) {
+        state.selection.style.opacity = normalized;
+        commitShapeChange(state.selection);
+      }
+    });
+  }
 
   elements.strokeColor.addEventListener("input", (event) => {
     state.style.stroke = event.target.value;
@@ -630,6 +998,16 @@ function bindEvents() {
     }
   });
 
+  if (Array.isArray(elements.strokeStyleButtons) && elements.strokeStyleButtons.length > 0) {
+    elements.strokeStyleButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const value = button.getAttribute("data-stroke-style");
+        if (!value) return;
+        applyStrokeStyle(value);
+      });
+    });
+  }
+
   if (Array.isArray(elements.sketchButtons) && elements.sketchButtons.length > 0) {
     elements.sketchButtons.forEach((button) => {
       button.addEventListener("click", () => {
@@ -641,7 +1019,7 @@ function bindEvents() {
 
   if (elements.fontFamily) {
     elements.fontFamily.addEventListener("change", (event) => {
-      const value = event.target.value || "Inter";
+      const value = event.target.value || DEFAULT_TEXT_FONT;
       state.style.fontFamily = value;
       if (state.selection && state.selection.type === "text") {
         state.selection.style.fontFamily = value;
@@ -700,6 +1078,7 @@ function bindEvents() {
   window.addEventListener("scroll", repositionActiveTextEditor);
   window.addEventListener("pointerdown", handleGlobalPointerDownForContextMenu);
   window.addEventListener("blur", closeAllContextMenus);
+  window.addEventListener("blur", resetModifierState);
   window.addEventListener("scroll", closeAllContextMenus, true);
   window.addEventListener("resize", closeAllContextMenus);
 
@@ -708,70 +1087,11 @@ function bindEvents() {
   });
 
   elements.groupShapes?.addEventListener("click", () => {
-    if (state.selectedIds.size < 2) {
-      return;
-    }
-
-    const ids = Array.from(state.selectedIds);
-    const sharedGroupId = getSharedGroupId(ids);
-    if (sharedGroupId && state.groups[sharedGroupId] && state.groups[sharedGroupId].size === ids.length) {
-      return; // already fully grouped
-    }
-
-    const groupId = `group-${groupIdCounter++}`;
-    const memberSet = new Set();
-
-    ids.forEach((id) => {
-      const shape = getShapeById(id);
-      if (!shape) return;
-      removeShapeFromCurrentGroup(shape);
-      shape.groupId = groupId;
-      memberSet.add(shape.id);
-    });
-
-    if (memberSet.size < 2) {
-      memberSet.forEach((id) => {
-        const shape = getShapeById(id);
-        if (shape) delete shape.groupId;
-      });
-      return;
-    }
-
-    state.groups[groupId] = memberSet;
-    setActiveGroupId(groupId);
-
-    const shapes = Array.from(memberSet)
-      .map((id) => getShapeById(id))
-      .filter(Boolean);
-    setSelectedShapes(shapes);
+    groupSelectedShapes();
   });
 
   elements.ungroupShapes?.addEventListener("click", () => {
-    const groupId = resolveSelectedGroupId();
-    if (!groupId) return;
-    const members = state.groups[groupId];
-    if (!members) return;
-    const shapes = Array.from(members)
-      .map((id) => getShapeById(id))
-      .filter(Boolean);
-    shapes.forEach((shape) => {
-      if (!shape) return;
-      if (shape.groupId === groupId) {
-        delete shape.groupId;
-      }
-    });
-    delete state.groups[groupId];
-    if (state.activeGroupId === groupId) {
-      setActiveGroupId(null);
-    } else {
-      syncActiveGroupState();
-    }
-    pruneEmptyGroups();
-    if (shapes.length > 0) {
-      setSelectedShapes(shapes);
-    } else {
-      setSelectedShapes([]);
-    }
+    ungroupSelectedShapes();
   });
 
   elements.timelineRange.addEventListener("input", (event) => {
@@ -867,6 +1187,7 @@ function bindEvents() {
   });
 
   window.addEventListener("keydown", handleGlobalKeyDown);
+  window.addEventListener("keyup", handleGlobalKeyUp);
   window.addEventListener("copy", handleGlobalCopy);
   window.addEventListener("cut", handleGlobalCut);
   window.addEventListener("paste", handleGlobalPaste);
@@ -887,6 +1208,7 @@ function setTool(tool) {
     button.setAttribute("aria-pressed", String(isActive));
   });
   syncArrowEndingUI();
+  syncSelectionInputs();
 }
 
 function updateStrokeWidthControl(tool) {
@@ -950,6 +1272,9 @@ function drawShape(context, shape) {
     case "square":
       drawRectangleShape(context, shape);
       break;
+    case "diamond":
+      drawDiamondShape(context, shape);
+      break;
     case "circle":
       drawCircleShape(context, shape);
       break;
@@ -973,35 +1298,344 @@ function drawShape(context, shape) {
   }
 }
 
+const FILL_PATTERN_CACHE = new Map();
+const PATTERN_CANVAS_SIZE = 16;
+const PATTERN_BASE_ALPHA = 0.22;
+const PATTERN_BACKGROUND_ALPHA = 0.12;
+const PATTERN_LINE_ALPHA = 0.6;
+
+function clampUnit(value) {
+  if (!Number.isFinite(value)) return 1;
+  if (value <= 0) return 0;
+  if (value >= 1) return 1;
+  return value;
+}
+
+function getPatternCanvas(fillStyle, color) {
+  const key = `${fillStyle}|${color}`;
+  if (FILL_PATTERN_CACHE.has(key)) {
+    return FILL_PATTERN_CACHE.get(key);
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = PATTERN_CANVAS_SIZE;
+  canvas.height = PATTERN_CANVAS_SIZE;
+  const patternCtx = canvas.getContext("2d");
+  if (!patternCtx) {
+    FILL_PATTERN_CACHE.set(key, null);
+    return null;
+  }
+
+  patternCtx.clearRect(0, 0, canvas.width, canvas.height);
+  patternCtx.fillStyle = color;
+  patternCtx.globalAlpha = PATTERN_BACKGROUND_ALPHA;
+  patternCtx.fillRect(0, 0, canvas.width, canvas.height);
+  patternCtx.globalAlpha = PATTERN_LINE_ALPHA;
+  patternCtx.strokeStyle = color;
+  patternCtx.lineWidth = 1;
+  patternCtx.lineCap = "square";
+
+  if (fillStyle === "hachure") {
+    const step = canvas.width / 2;
+    patternCtx.beginPath();
+    patternCtx.moveTo(-step, canvas.height);
+    patternCtx.lineTo(canvas.width, -step);
+    patternCtx.moveTo(0, canvas.height);
+    patternCtx.lineTo(canvas.width, 0);
+    patternCtx.moveTo(step, canvas.height);
+    patternCtx.lineTo(canvas.width, step);
+    patternCtx.stroke();
+  } else if (fillStyle === "cross-hatch") {
+    const step = canvas.width / 2;
+    patternCtx.beginPath();
+    for (let offset = -canvas.width; offset <= canvas.width; offset += step) {
+      patternCtx.moveTo(offset, canvas.height);
+      patternCtx.lineTo(offset + canvas.width, 0);
+      patternCtx.moveTo(offset, 0);
+      patternCtx.lineTo(offset + canvas.width, canvas.height);
+    }
+    patternCtx.stroke();
+  } else {
+    patternCtx.globalAlpha = 1;
+    FILL_PATTERN_CACHE.set(key, null);
+    return null;
+  }
+
+  patternCtx.globalAlpha = 1;
+  FILL_PATTERN_CACHE.set(key, canvas);
+  return canvas;
+}
+
+function getFillPattern(context, color, fillStyle) {
+  const canvas = getPatternCanvas(fillStyle, color);
+  if (!canvas) return null;
+  try {
+    return context.createPattern(canvas, "repeat");
+  } catch (error) {
+    return null;
+  }
+}
+
+function resolveShapeOpacity(style) {
+  if (style && typeof style.opacity === "number") {
+    return clampUnit(style.opacity);
+  }
+  if (state.style && typeof state.style.opacity === "number") {
+    return clampUnit(state.style.opacity);
+  }
+  return 1;
+}
+
+function withGlobalOpacity(context, opacity, draw) {
+  const clamped = clampUnit(opacity);
+  if (clamped <= 0) {
+    return;
+  }
+  if (clamped >= 0.999) {
+    draw();
+    return;
+  }
+  context.save();
+  context.globalAlpha *= clamped;
+  try {
+    draw();
+  } finally {
+    context.restore();
+  }
+}
+
+function fillPathWithStyle(context, style = {}, buildPath) {
+  if (typeof buildPath !== "function") {
+    return;
+  }
+  const fallbackColor = state.style?.fill || "#ff6b6b";
+  const rawColor = typeof style.fill === "string" && style.fill.trim() !== ""
+    ? style.fill
+    : fallbackColor;
+  const resolvedStyle = normalizeFillStyle(style.fillStyle ?? state.style?.fillStyle ?? DEFAULT_FILL_STYLE);
+  const opacity = resolveShapeOpacity(style);
+  if (opacity <= 0) {
+    return;
+  }
+
+  if (resolvedStyle === "solid" || rawColor === "transparent") {
+    buildPath();
+    withGlobalOpacity(context, opacity, () => {
+      context.fillStyle = rawColor;
+      context.fill();
+    });
+    return;
+  }
+
+  buildPath();
+  withGlobalOpacity(context, opacity * PATTERN_BASE_ALPHA, () => {
+    context.fillStyle = rawColor;
+    context.fill();
+  });
+
+  const pattern = getFillPattern(context, rawColor, resolvedStyle);
+  if (pattern) {
+    buildPath();
+    withGlobalOpacity(context, opacity, () => {
+      context.fillStyle = pattern;
+      context.fill();
+    });
+  } else {
+    buildPath();
+    withGlobalOpacity(context, opacity, () => {
+      context.fillStyle = rawColor;
+      context.fill();
+    });
+  }
+}
+
 function drawRectangleShape(context, shape) {
   const { style, live } = shape;
+  const opacity = resolveShapeOpacity(style);
   const center = getShapeCenter(shape);
   const rotation = live.rotation || 0;
   const width = live.width;
   const height = live.height;
+  const absWidth = Math.abs(width || 0);
+  const absHeight = Math.abs(height || 0);
+  const edgeStyle = normalizeEdgeStyle(style.edgeStyle ?? state.style.edgeStyle ?? DEFAULT_EDGE_STYLE);
+  const minDimension = Math.max(0, Math.min(absWidth, absHeight));
+  const radius = edgeStyle === "round" && minDimension > 0
+    ? Math.min(Math.max(minDimension * 0.25, 8), minDimension / 2)
+    : 0;
 
   context.save();
   context.translate(center.x, center.y);
   context.rotate(rotation);
-  context.fillStyle = style.fill;
   context.strokeStyle = style.stroke;
   context.lineWidth = style.strokeWidth;
-  context.lineCap = "round";
-  context.lineJoin = "round";
+  context.lineCap = edgeStyle === "round" ? "round" : "butt";
+  context.lineJoin = edgeStyle === "round" ? "round" : "miter";
+  applyStrokePattern(context, style);
 
-  context.beginPath();
-  context.rect(-width / 2, -height / 2, width, height);
-  context.fill();
+  const buildPath = () => {
+    context.beginPath();
+    if (radius > 0) {
+      const left = -absWidth / 2;
+      const top = -absHeight / 2;
+      if (typeof context.roundRect === "function") {
+        context.roundRect(left, top, absWidth, absHeight, radius);
+      } else {
+        traceRoundedRectCentered(context, absWidth, absHeight, radius);
+      }
+    } else {
+      context.rect(-absWidth / 2, -absHeight / 2, absWidth, absHeight);
+    }
+  };
+
+  fillPathWithStyle(context, style, buildPath);
 
   if (style.strokeWidth > 0) {
-    if (style.sketchLevel > 0) {
-      drawSketchStroke(context, () => {
-        context.beginPath();
-        context.rect(-width / 2, -height / 2, width, height);
-      }, shape, style.sketchLevel);
-    } else {
-      context.stroke();
+    withGlobalOpacity(context, opacity, () => {
+      if (style.sketchLevel > 0) {
+        drawSketchStroke(context, buildPath, shape, style.sketchLevel);
+      } else {
+        buildPath();
+        context.stroke();
+      }
+    });
+  }
+
+  context.restore();
+}
+
+function applyStrokePattern(context, style) {
+  const width = Math.max(0.5, Number(style?.strokeWidth) || Number(state.style?.strokeWidth) || 1);
+  const strokeStyle = normalizeStrokeStyle(style?.strokeStyle ?? state.style?.strokeStyle ?? DEFAULT_STROKE_STYLE);
+  if (strokeStyle === "dashed") {
+    const dash = Math.max(4, width * 3);
+    context.setLineDash([dash, dash]);
+  } else if (strokeStyle === "dotted") {
+    const dot = Math.max(1, width);
+    const gap = Math.max(dot, width * 1.8);
+    context.setLineDash([dot, gap]);
+    context.lineCap = "round";
+  } else {
+    context.setLineDash([]);
+  }
+}
+
+function traceRoundedRectCentered(context, width, height, radius) {
+  const halfWidth = Math.max(0, width / 2);
+  const halfHeight = Math.max(0, height / 2);
+  const clampedRadius = Math.max(0, Math.min(radius, halfWidth, halfHeight));
+  const left = -halfWidth;
+  const right = halfWidth;
+  const top = -halfHeight;
+  const bottom = halfHeight;
+
+  context.moveTo(right - clampedRadius, top);
+  context.lineTo(left + clampedRadius, top);
+  context.quadraticCurveTo(left, top, left, top + clampedRadius);
+  context.lineTo(left, bottom - clampedRadius);
+  context.quadraticCurveTo(left, bottom, left + clampedRadius, bottom);
+  context.lineTo(right - clampedRadius, bottom);
+  context.quadraticCurveTo(right, bottom, right, bottom - clampedRadius);
+  context.lineTo(right, top + clampedRadius);
+  context.quadraticCurveTo(right, top, right - clampedRadius, top);
+  context.closePath();
+}
+
+function drawDiamondShape(context, shape) {
+  const { style, live } = shape;
+  const opacity = resolveShapeOpacity(style);
+  const center = getShapeCenter(shape);
+  const rotation = live.rotation || 0;
+  const width = live.width;
+  const height = live.height;
+  const edgeStyle = normalizeEdgeStyle(style.edgeStyle ?? state.style.edgeStyle ?? DEFAULT_EDGE_STYLE);
+
+  context.save();
+  context.translate(center.x, center.y);
+  context.rotate(rotation);
+  context.strokeStyle = style.stroke;
+  context.lineWidth = style.strokeWidth;
+  context.lineCap = edgeStyle === "round" ? "round" : "butt";
+  context.lineJoin = edgeStyle === "round" ? "round" : "miter";
+  applyStrokePattern(context, style);
+
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const absHalfWidth = Math.abs(halfWidth);
+  const absHalfHeight = Math.abs(halfHeight);
+
+  const corners = [
+    { x: 0, y: -halfHeight },
+    { x: halfWidth, y: 0 },
+    { x: 0, y: halfHeight },
+    { x: -halfWidth, y: 0 },
+  ];
+
+  const edgeLengths = corners.map((corner, index) => {
+    const next = corners[(index + 1) % corners.length];
+    return Math.hypot(next.x - corner.x, next.y - corner.y);
+  });
+
+  const minEdgeLength = Math.max(0, Math.min(...edgeLengths));
+  const minDimension = Math.max(0, Math.min(absHalfWidth, absHalfHeight)) * 2;
+  const rawInset = minDimension > 0 ? Math.max(minDimension * 0.18, 4) : 0;
+  const inset = edgeStyle === "round" ? Math.min(rawInset, minEdgeLength / 2) : 0;
+
+  const buildPath = () => {
+    context.beginPath();
+
+    if (inset <= 0) {
+      context.moveTo(0, -halfHeight);
+      context.lineTo(halfWidth, 0);
+      context.lineTo(0, halfHeight);
+      context.lineTo(-halfWidth, 0);
+      context.closePath();
+      return;
     }
+
+    const segments = corners.map((corner, index, list) => {
+      const prev = list[(index - 1 + list.length) % list.length];
+      const next = list[(index + 1) % list.length];
+
+      const prevVector = { x: prev.x - corner.x, y: prev.y - corner.y };
+      const nextVector = { x: next.x - corner.x, y: next.y - corner.y };
+
+      const prevLength = Math.hypot(prevVector.x, prevVector.y) || 1;
+      const nextLength = Math.hypot(nextVector.x, nextVector.y) || 1;
+
+      const prevNormal = { x: (prevVector.x / prevLength) * inset, y: (prevVector.y / prevLength) * inset };
+      const nextNormal = { x: (nextVector.x / nextLength) * inset, y: (nextVector.y / nextLength) * inset };
+
+      return {
+        corner,
+        start: { x: corner.x + prevNormal.x, y: corner.y + prevNormal.y },
+        end: { x: corner.x + nextNormal.x, y: corner.y + nextNormal.y },
+      };
+    });
+
+    const first = segments[0];
+    context.moveTo(first.end.x, first.end.y);
+
+    for (let i = 0; i < segments.length; i += 1) {
+      const current = segments[i];
+      const next = segments[(i + 1) % segments.length];
+      context.lineTo(next.start.x, next.start.y);
+      context.quadraticCurveTo(next.corner.x, next.corner.y, next.end.x, next.end.y);
+    }
+
+    context.closePath();
+  };
+
+  fillPathWithStyle(context, style, buildPath);
+
+  if (style.strokeWidth > 0) {
+    withGlobalOpacity(context, opacity, () => {
+      if (style.sketchLevel > 0) {
+        drawSketchStroke(context, buildPath, shape, style.sketchLevel);
+      } else {
+        buildPath();
+        context.stroke();
+      }
+    });
   }
 
   context.restore();
@@ -1009,6 +1643,7 @@ function drawRectangleShape(context, shape) {
 
 function drawImageShape(context, shape) {
   const { style = {}, live = {}, asset = {} } = shape;
+  const opacity = resolveShapeOpacity(style);
   const center = getShapeCenter(shape);
   const rotation = live.rotation || 0;
   const width = live.width;
@@ -1029,27 +1664,30 @@ function drawImageShape(context, shape) {
       context.stroke();
     }
   context.fillStyle = "rgba(30, 41, 59, 0.6)";
-  context.font = `16px ${getFontStack("Inter")}`;
+  context.font = `16px ${getFontStack(DEFAULT_TEXT_FONT)}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.fillText("Image", 0, 0);
   };
 
-  if (asset.image instanceof Image && asset.image.complete) {
-    try {
-      context.drawImage(asset.image, -width / 2, -height / 2, width, height);
-    } catch (error) {
+  withGlobalOpacity(context, opacity, () => {
+    if (asset.image instanceof Image && asset.image.complete) {
+      try {
+        context.drawImage(asset.image, -width / 2, -height / 2, width, height);
+      } catch (error) {
+        drawFallback();
+      }
+    } else {
       drawFallback();
     }
-  } else {
-    drawFallback();
-  }
+  });
 
   context.restore();
 }
 
 function drawCircleShape(context, shape) {
   const { style, live } = shape;
+  const opacity = resolveShapeOpacity(style);
   const center = getShapeCenter(shape);
   const rotation = live.rotation || 0;
   const radius = Math.max(live.width, live.height) / 2;
@@ -1057,25 +1695,28 @@ function drawCircleShape(context, shape) {
   context.save();
   context.translate(center.x, center.y);
   context.rotate(rotation);
-  context.fillStyle = style.fill;
   context.strokeStyle = style.stroke;
   context.lineWidth = style.strokeWidth;
   context.lineCap = "round";
   context.lineJoin = "round";
+  applyStrokePattern(context, style);
+  applyStrokePattern(context, style);
 
   const drawPath = () => {
     context.beginPath();
     context.arc(0, 0, radius, 0, Math.PI * 2);
   };
 
-  drawPath();
-  context.fill();
+  fillPathWithStyle(context, style, drawPath);
   if (style.strokeWidth > 0) {
-    if (style.sketchLevel > 0) {
-      drawSketchStroke(context, drawPath, shape, style.sketchLevel);
-    } else {
-      context.stroke();
-    }
+    withGlobalOpacity(context, opacity, () => {
+      if (style.sketchLevel > 0) {
+        drawSketchStroke(context, drawPath, shape, style.sketchLevel);
+      } else {
+        drawPath();
+        context.stroke();
+      }
+    });
   }
 
   context.restore();
@@ -1084,23 +1725,33 @@ function drawCircleShape(context, shape) {
 function drawLineShape(context, shape) {
   const { style, live } = shape;
   if (!live.start || !live.end) return;
+  const opacity = resolveShapeOpacity(style);
   context.save();
   context.strokeStyle = style.stroke;
   context.lineWidth = style.strokeWidth;
   context.lineCap = "round";
   context.lineJoin = "round";
+  applyStrokePattern(context, style);
 
   const drawPath = () => {
     context.beginPath();
     context.moveTo(live.start.x, live.start.y);
-    context.lineTo(live.end.x, live.end.y);
+    if (live.control) {
+      context.quadraticCurveTo(live.control.x, live.control.y, live.end.x, live.end.y);
+    } else {
+      context.lineTo(live.end.x, live.end.y);
+    }
   };
 
-  if (style.sketchLevel > 0 && style.strokeWidth > 0) {
-    drawSketchStroke(context, drawPath, shape, style.sketchLevel);
-  } else {
-    drawPath();
-    context.stroke();
+  if (style.strokeWidth > 0) {
+    withGlobalOpacity(context, opacity, () => {
+      if (style.sketchLevel > 0) {
+        drawSketchStroke(context, drawPath, shape, style.sketchLevel);
+      } else {
+        drawPath();
+        context.stroke();
+      }
+    });
   }
 
   context.restore();
@@ -1124,6 +1775,7 @@ function drawArrowShape(context, shape) {
 function drawFreeShape(context, shape) {
   const { style, live } = shape;
   if (!live.points || live.points.length < 2) return;
+  const opacity = resolveShapeOpacity(style);
   context.save();
   context.strokeStyle = style.stroke;
   context.lineWidth = style.strokeWidth;
@@ -1139,10 +1791,14 @@ function drawFreeShape(context, shape) {
   };
 
   if (style.sketchLevel > 0 && style.strokeWidth > 0) {
-    drawSketchStroke(context, drawPath, shape, style.sketchLevel);
+    withGlobalOpacity(context, opacity, () => {
+      drawSketchStroke(context, drawPath, shape, style.sketchLevel);
+    });
   } else {
-    drawPath();
-    context.stroke();
+    withGlobalOpacity(context, opacity, () => {
+      drawPath();
+      context.stroke();
+    });
   }
 
   context.restore();
@@ -1152,10 +1808,12 @@ function drawTextShape(context, shape) {
   if (!shape || shape.type !== "text") return;
   const { style, live } = shape;
   if (!live) return;
+  const opacity = resolveShapeOpacity(style);
+  if (opacity <= 0) return;
   const text = typeof live.text === "string" ? live.text : "";
   const lines = text.split(/\r?\n/);
   const fontSize = Math.max(6, Number(style.fontSize) || state.style.fontSize || 32);
-  const fontFamily = style.fontFamily || state.style.fontFamily || "Inter";
+  const fontFamily = style.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT;
   const center = getShapeCenter(shape);
   const rotation = live.rotation || 0;
 
@@ -1173,9 +1831,11 @@ function drawTextShape(context, shape) {
   context.textBaseline = "top";
   context.textAlign = "left";
 
-  lines.forEach((line, index) => {
-    const safeLine = line.length === 0 ? " " : line;
-    context.fillText(safeLine, startX, startY + index * lineHeight);
+  withGlobalOpacity(context, opacity, () => {
+    lines.forEach((line, index) => {
+      const safeLine = line.length === 0 ? " " : line;
+      context.fillText(safeLine, startX, startY + index * lineHeight);
+    });
   });
 
   context.restore();
@@ -1188,43 +1848,46 @@ function drawArrowHead(context, start, end, size, style) {
   const leftY = end.y - headLength * Math.sin(angle - Math.PI / 6);
   const rightX = end.x - headLength * Math.cos(angle + Math.PI / 6);
   const rightY = end.y - headLength * Math.sin(angle + Math.PI / 6);
-
-  context.save();
-  context.fillStyle = style.stroke;
-  context.beginPath();
-  context.moveTo(end.x, end.y);
-  context.lineTo(leftX, leftY);
-  context.lineTo(rightX, rightY);
-  context.closePath();
-  context.fill();
-  context.restore();
+  const opacity = resolveShapeOpacity(style);
+  withGlobalOpacity(context, opacity, () => {
+    context.beginPath();
+    context.fillStyle = style.stroke;
+    context.moveTo(end.x, end.y);
+    context.lineTo(leftX, leftY);
+    context.lineTo(rightX, rightY);
+    context.closePath();
+    context.fill();
+  });
 }
 
-function drawSelectionBounds(context) {
-  if (!state.selection) return;
-  const pointerMode = state.pointer?.mode;
-  if (pointerMode === "creating" || pointerMode === "drawing-free") {
-    return;
-  }
-  const shape = state.selection;
-  if (shape.isVisible === false) return;
-
-  context.save();
-  context.setLineDash([6, 4]);
-  context.strokeStyle = "#ffffff";
-  context.lineWidth = 1;
+function drawShapeSelectionOutline(context, shape, { includeHandles = true } = {}) {
+  if (!shape || shape.isVisible === false) return;
 
   if (shape.type === "line" || shape.type === "arrow") {
     context.beginPath();
     context.moveTo(shape.live.start.x, shape.live.start.y);
-    context.lineTo(shape.live.end.x, shape.live.end.y);
+    if (shape.live.control && shape.type === "line") {
+      context.quadraticCurveTo(shape.live.control.x, shape.live.control.y, shape.live.end.x, shape.live.end.y);
+    } else {
+      context.lineTo(shape.live.end.x, shape.live.end.y);
+    }
     context.stroke();
-    drawLineEndpointHandle(context, shape.live.start);
-    drawLineEndpointHandle(context, shape.live.end);
-  } else if (shape.type === "free") {
+    if (includeHandles) {
+      drawLineEndpointHandle(context, shape.live.start);
+      drawLineEndpointHandle(context, shape.live.end);
+      if (shape.type === "line") {
+        drawLineBendHandle(context, getLineBendHandlePosition(shape));
+      }
+    }
+    return;
+  }
+
+  if (shape.type === "free") {
     const bounds = getShapeBounds(shape);
     context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
-    drawResizeHandle(context, bounds.x + bounds.width, bounds.y + bounds.height);
+    if (includeHandles) {
+      drawResizeHandle(context, bounds.x + bounds.width, bounds.y + bounds.height);
+    }
   } else {
     const center = getShapeCenter(shape);
     const rotation = shape.live.rotation || 0;
@@ -1233,21 +1896,167 @@ function drawSelectionBounds(context) {
     context.rotate(rotation);
     context.strokeRect(-shape.live.width / 2, -shape.live.height / 2, shape.live.width, shape.live.height);
     context.restore();
-    const handle = getRectResizeHandlePosition(shape);
-    drawResizeHandle(context, handle.x, handle.y);
+    if (includeHandles) {
+      const handle = getRectResizeHandlePosition(shape);
+      drawResizeHandle(context, handle.x, handle.y);
+    }
   }
 
-  const rotationHandle = getRotationHandlePosition(shape);
-  if (rotationHandle) {
-    context.setLineDash([]);
-    context.strokeStyle = "rgba(255, 255, 255, 0.6)";
-    if (rotationHandle.anchor) {
-      context.beginPath();
-      context.moveTo(rotationHandle.anchor.x, rotationHandle.anchor.y);
-      context.lineTo(rotationHandle.position.x, rotationHandle.position.y);
-      context.stroke();
+  if (includeHandles) {
+    const rotationHandle = getRotationHandlePosition(shape);
+    if (rotationHandle) {
+      drawRotationHandle(context, rotationHandle.position);
     }
-    drawRotationHandle(context, rotationHandle.position);
+  }
+}
+
+function getSelectionBoundingRect(shapes) {
+  if (!Array.isArray(shapes) || shapes.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  shapes.forEach((shape) => {
+    if (!shape || shape.isVisible === false) return;
+    const bounds = getShapeBounds(shape);
+    if (!bounds) return;
+    minX = Math.min(minX, bounds.x);
+    minY = Math.min(minY, bounds.y);
+    maxX = Math.max(maxX, bounds.x + bounds.width);
+    maxY = Math.max(maxY, bounds.y + bounds.height);
+  });
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return null;
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(0, maxX - minX),
+    height: Math.max(0, maxY - minY),
+  };
+}
+
+const GROUP_HANDLE_SIZE = 16;
+const GROUP_ROTATION_HANDLE_OFFSET = 36;
+
+function drawGroupHandles(context, bounds) {
+  if (!context || !bounds) return;
+  const handleX = bounds.x + bounds.width;
+  const handleY = bounds.y + bounds.height;
+  drawResizeHandle(context, handleX, handleY);
+
+  const centerX = bounds.x + bounds.width / 2;
+  const anchor = { x: centerX, y: bounds.y };
+  const rotationPosition = { x: centerX, y: bounds.y - GROUP_ROTATION_HANDLE_OFFSET };
+
+  context.save();
+  context.setLineDash([]);
+  context.strokeStyle = "rgba(96, 165, 250, 0.8)";
+  context.lineWidth = 1.5;
+  context.beginPath();
+  context.moveTo(anchor.x, anchor.y);
+  context.lineTo(rotationPosition.x, rotationPosition.y);
+  context.stroke();
+  drawRotationHandle(context, rotationPosition);
+  context.restore();
+}
+
+function detectGroupResizeHandle(point, bounds) {
+  if (!point || !bounds) return null;
+  const handleX = bounds.x + bounds.width;
+  const handleY = bounds.y + bounds.height;
+  if (Math.abs(point.x - handleX) > GROUP_HANDLE_SIZE || Math.abs(point.y - handleY) > GROUP_HANDLE_SIZE) {
+    return null;
+  }
+  const center = {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2,
+  };
+  return {
+    type: "group-resize",
+    position: { x: handleX, y: handleY },
+    center,
+    bounds: { ...bounds },
+    localVector: {
+      x: Math.max(1, bounds.width / 2),
+      y: Math.max(1, bounds.height / 2),
+    },
+  };
+}
+
+function detectGroupRotateHandle(point, bounds) {
+  if (!point || !bounds) return null;
+  const center = {
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2,
+  };
+  const anchor = { x: center.x, y: bounds.y };
+  const handle = { x: center.x, y: bounds.y - GROUP_ROTATION_HANDLE_OFFSET };
+  const radius = GROUP_HANDLE_SIZE + 4;
+  if (distance(point, handle) > radius) {
+    return null;
+  }
+  return {
+    type: "group-rotate",
+    position: handle,
+    anchor,
+    center,
+    bounds: { ...bounds },
+    pointerAngle: Math.atan2(point.y - center.y, point.x - center.x),
+  };
+}
+
+function detectGroupHandle(point, bounds) {
+  if (!point || !bounds) return null;
+  const rotateHandle = detectGroupRotateHandle(point, bounds);
+  if (rotateHandle) {
+    return rotateHandle;
+  }
+  return detectGroupResizeHandle(point, bounds);
+}
+
+function drawSelectionBounds(context) {
+  const selectedCount = state.selectedIds?.size ?? 0;
+  if (selectedCount === 0) return;
+  const pointerMode = state.pointer?.mode;
+  if (pointerMode === "creating" || pointerMode === "drawing-free") {
+    return;
+  }
+
+  const primaryShape = state.selection ?? null;
+  const multiSelected = selectedCount > 1;
+  const selectedShapes = multiSelected ? getSelectedShapesList() : primaryShape ? [primaryShape] : [];
+
+  context.save();
+  context.setLineDash([6, 4]);
+  context.lineWidth = 1;
+
+  if (multiSelected) {
+    const bounds = getSelectionBoundingRect(selectedShapes);
+    if (bounds) {
+      context.strokeStyle = "rgba(96, 165, 250, 0.95)";
+      context.lineWidth = 2;
+      context.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+
+      context.setLineDash([6, 4]);
+      context.lineWidth = 1.5;
+      context.strokeStyle = "rgba(96, 165, 250, 0.8)";
+      selectedShapes.forEach((shape) => {
+        drawShapeSelectionOutline(context, shape, { includeHandles: false });
+      });
+
+      drawGroupHandles(context, bounds);
+    }
+  }
+
+  if (!multiSelected && primaryShape) {
+    context.setLineDash([6, 4]);
+    context.lineWidth = 1;
+    context.strokeStyle = "#ffffff";
+    drawShapeSelectionOutline(context, primaryShape, { includeHandles: true });
   }
 
   context.restore();
@@ -1295,8 +2104,82 @@ function drawLineEndpointHandle(context, position) {
   context.restore();
 }
 
+function drawLineBendHandle(context, position) {
+  if (!position) return;
+  const radius = 7;
+  context.save();
+  context.setLineDash([]);
+  context.fillStyle = "#38bdf8";
+  context.strokeStyle = "#0f172a";
+  context.lineWidth = 1.25;
+  context.beginPath();
+  context.arc(position.x, position.y, radius, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+  context.restore();
+}
+
+function updateModifierStateFromEvent(event, { allowFalse = true } = {}) {
+  if (!event) return;
+  const apply = (key, value) => {
+    if (value) {
+      state.modifiers[key] = true;
+    } else if (allowFalse) {
+      state.modifiers[key] = false;
+    }
+  };
+  apply("shift", event.shiftKey);
+  apply("ctrl", event.ctrlKey);
+  apply("meta", event.metaKey);
+  apply("alt", event.altKey);
+}
+
+function resetModifierState() {
+  state.modifiers.shift = false;
+  state.modifiers.ctrl = false;
+  state.modifiers.meta = false;
+  state.modifiers.alt = false;
+}
+
+function isMultiSelectModifierActive(event) {
+  if (event && (event.shiftKey || event.metaKey || event.ctrlKey)) {
+    return true;
+  }
+  return state.modifiers.shift || state.modifiers.meta || state.modifiers.ctrl;
+}
+
+function captureMultiSelectionSnapshot() {
+  if (!state.selectedIds || state.selectedIds.size === 0) {
+    state.pointer.multiSnapshot = null;
+    state.pointer.multiStyles = null;
+    return false;
+  }
+
+  const snapshotMap = new Map();
+  const styleMap = new Map();
+
+  state.selectedIds.forEach((id) => {
+    const target = getShapeById(id);
+    if (!target) return;
+    snapshotMap.set(id, cloneSnapshot(target.live));
+    styleMap.set(id, JSON.parse(JSON.stringify(target.style || {})));
+  });
+
+  if (snapshotMap.size === 0) {
+    state.pointer.multiSnapshot = null;
+    state.pointer.multiStyles = null;
+    return false;
+  }
+
+  state.pointer.multiSnapshot = snapshotMap;
+  state.pointer.multiStyles = styleMap;
+  return true;
+}
+
 function handlePointerDown(event) {
   closeAllContextMenus();
+
+  updateModifierStateFromEvent(event, { allowFalse: false });
 
   const nonPrimaryButton = (() => {
     if (typeof event.button === "number") {
@@ -1327,6 +2210,7 @@ function handlePointerDown(event) {
   state.pointer.startHandleVector = null;
   state.pointer.startStyle = null;
   state.pointer.multiSnapshot = null;
+  state.pointer.multiStyles = null;
   if (typeof event.pointerId === "number" && !event.isSyntheticPointer) {
     state.pointer.usingPointerEvents = true;
     if (typeof canvas.setPointerCapture === "function") {
@@ -1346,6 +2230,34 @@ function handlePointerDown(event) {
     finalizeActiveTextEditor();
   }
 
+  const multiSelected = state.selectedIds.size > 1;
+  if (multiSelected && state.tool === "select") {
+    const selectedShapes = getSelectedShapesList();
+    const groupBounds = getSelectionBoundingRect(selectedShapes);
+    const groupHandle = detectGroupHandle(point, groupBounds);
+    if (groupHandle) {
+      if (!captureMultiSelectionSnapshot()) {
+        state.pointer.mode = "idle";
+        return;
+      }
+      state.pointer.mode = groupHandle.type === "group-rotate" ? "rotating" : "resizing";
+      state.pointer.startSnapshot = state.selection ? cloneSnapshot(state.selection.live) : null;
+      state.pointer.startCenter = groupHandle.center;
+      state.pointer.startBounds = groupHandle.bounds ? { ...groupHandle.bounds } : groupBounds ? { ...groupBounds } : null;
+      state.pointer.activeHandle = groupHandle;
+      state.pointer.startHandleVector = groupHandle.localVector || null;
+      if (groupHandle.type === "group-rotate") {
+        const angle = groupHandle.pointerAngle ?? Math.atan2(point.y - groupHandle.center.y, point.x - groupHandle.center.x);
+        state.pointer.rotationStartAngle = angle;
+      } else {
+        state.pointer.rotationStartAngle = 0;
+      }
+      state.pointer.startRotation = 0;
+      prepareHistory(groupHandle.type === "group-rotate" ? "rotate-shape" : "resize-shape");
+      return;
+    }
+  }
+
   let handleTarget = null;
   let shape = null;
 
@@ -1353,10 +2265,11 @@ function handlePointerDown(event) {
     const selected = state.selection;
     const rotateHandle = detectRotateHandle(selected, point);
     const resizeHandle = detectResizeHandle(selected, point);
+    const bendHandle = detectLineBendHandle(selected, point);
     const lineHandle = detectLineEndpointHandle(selected, point);
-    if (rotateHandle || resizeHandle || lineHandle) {
+    if (rotateHandle || resizeHandle || bendHandle || lineHandle) {
       shape = selected;
-      handleTarget = rotateHandle || resizeHandle || lineHandle;
+      handleTarget = rotateHandle || resizeHandle || bendHandle || lineHandle;
     }
   }
 
@@ -1371,7 +2284,7 @@ function handlePointerDown(event) {
 
   if (shape) {
     const alreadySelected = state.selectedIds.has(shape.id);
-    const allowMulti = state.tool === "select" && (event.shiftKey || event.metaKey || event.ctrlKey);
+  const allowMulti = state.tool === "select" && isMultiSelectModifierActive(event);
 
     if (allowMulti) {
       const current = getSelectedShapesList();
@@ -1415,6 +2328,20 @@ function handlePointerDown(event) {
     }
     state.pointer.startStyle = { ...shape.style };
 
+    const bendHandle = handleTarget && handleTarget.type === "line-bend"
+      ? handleTarget
+      : detectLineBendHandle(shape, point);
+    if (bendHandle) {
+      state.pointer.mode = "bending-line";
+      state.pointer.startSnapshot = cloneSnapshot(shape.live);
+      state.pointer.activeHandle = bendHandle;
+      if (state.selectedIds.size > 1) {
+        captureMultiSelectionSnapshot();
+      }
+      prepareHistory("bend-line");
+      return;
+    }
+
     const lineHandle = handleTarget && (handleTarget === "start" || handleTarget === "end")
       ? handleTarget
       : detectLineEndpointHandle(shape, point);
@@ -1422,12 +2349,7 @@ function handlePointerDown(event) {
       state.pointer.mode = lineHandle === "start" ? "resizing-line-start" : "resizing-line-end";
       state.pointer.startSnapshot = cloneSnapshot(shape.live);
       if (state.selectedIds.size > 1) {
-        state.pointer.multiSnapshot = new Map();
-        state.selectedIds.forEach((id) => {
-          const target = state.shapes.find((entry) => entry.id === id);
-          if (!target) return;
-          state.pointer.multiSnapshot.set(id, cloneSnapshot(target.live));
-        });
+        captureMultiSelectionSnapshot();
       }
       prepareHistory("adjust-line-endpoint");
       return;
@@ -1463,12 +2385,7 @@ function handlePointerDown(event) {
     state.pointer.startSnapshot = cloneSnapshot(shape.live);
     state.pointer.startCenter = getShapeCenter(shape);
     if (state.selectedIds.size > 1) {
-      state.pointer.multiSnapshot = new Map();
-      state.selectedIds.forEach((id) => {
-        const target = state.shapes.find((entry) => entry.id === id);
-        if (!target) return;
-        state.pointer.multiSnapshot.set(id, cloneSnapshot(target.live));
-      });
+      captureMultiSelectionSnapshot();
     }
     prepareHistory("move-shapes");
     return;
@@ -1480,7 +2397,7 @@ function handlePointerDown(event) {
       start: { ...state.pointer.start },
       current: { ...state.pointer.start },
     };
-    state.pointer.marqueeAppend = Boolean(event.shiftKey || event.metaKey || event.ctrlKey);
+    state.pointer.marqueeAppend = Boolean(isMultiSelectModifierActive(event));
     if (!state.pointer.marqueeAppend) {
       setSelectedShapes([]);
     }
@@ -1518,6 +2435,7 @@ function handlePointerMove(event) {
     "rotating",
     "resizing-line-start",
     "resizing-line-end",
+    "bending-line",
   ].includes(state.pointer.mode)) {
     switch (state.pointer.mode) {
       case "moving":
@@ -1532,14 +2450,25 @@ function handlePointerMove(event) {
         }
         break;
       case "resizing":
-        resizeShape(state.selection, point);
+        if (state.pointer.multiSnapshot && state.pointer.multiSnapshot.size > 0) {
+          resizeGroupSelection(point);
+        } else {
+          resizeShape(state.selection, point);
+        }
         break;
       case "rotating":
-        rotateShape(state.selection, point);
+        if (state.pointer.multiSnapshot && state.pointer.multiSnapshot.size > 0) {
+          rotateGroupSelection(point);
+        } else {
+          rotateShape(state.selection, point);
+        }
         break;
       case "resizing-line-start":
       case "resizing-line-end":
         resizeLineEndpoint(state.selection, point, state.pointer.mode);
+        break;
+      case "bending-line":
+        bendLineShape(state.selection, point);
         break;
       default:
         break;
@@ -1567,6 +2496,7 @@ function resetPointerInteraction() {
   state.pointer.startHandleVector = null;
   state.pointer.startStyle = null;
   state.pointer.multiSnapshot = null;
+  state.pointer.multiStyles = null;
   state.pointer.marquee = null;
   state.pointer.marqueeAppend = false;
   state.pointer.usingPointerEvents = false;
@@ -1611,8 +2541,10 @@ function handlePointerUp(event) {
     "rotating",
     "resizing-line-start",
     "resizing-line-end",
+    "bending-line",
   ].includes(pointerMode)) {
-    if (pointerMode === "moving" && state.pointer.multiSnapshot && state.pointer.multiSnapshot.size > 0) {
+    const hasMultiSnapshot = state.pointer.multiSnapshot && state.pointer.multiSnapshot.size > 0;
+    if (hasMultiSnapshot) {
       state.pointer.multiSnapshot.forEach((_, id) => {
         const target = state.shapes.find((shape) => shape.id === id);
         if (!target) return;
@@ -1642,6 +2574,7 @@ function handleMouseDownFallback(event) {
     closeAllContextMenus();
     return;
   }
+  updateModifierStateFromEvent(event, { allowFalse: false });
   handlePointerDown(createSyntheticPointerEvent(event));
 }
 
@@ -1782,7 +2715,7 @@ function createTextShapeAt(point) {
   const historyEntry = createHistoryEntry("create-text");
   const shape = createShape("text", origin, origin);
   if (!shape) return null;
-  shape.style.fontFamily = shape.style.fontFamily || state.style.fontFamily || "Inter";
+  shape.style.fontFamily = shape.style.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT;
   shape.style.fontSize = Math.max(6, shape.style.fontSize || state.style.fontSize || 32);
   shape.style.rotation = shape.style.rotation || 0;
   shape.live.rotation = shape.live.rotation || 0;
@@ -1808,7 +2741,7 @@ function handleCanvasDoubleClick(event) {
 function measureTextMetrics(text, style = {}) {
   const lines = (typeof text === "string" && text.length > 0 ? text : "").split(/\r?\n/);
   const fontSize = Math.max(6, Number(style.fontSize) || state.style.fontSize || 32);
-  const fontFamily = style.fontFamily || state.style.fontFamily || "Inter";
+  const fontFamily = style.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT;
   const effectiveLines = lines.length > 0 ? lines : [""];
   ctx.save();
   ctx.font = `${fontSize}px ${getFontStack(fontFamily)}`;
@@ -1872,6 +2805,29 @@ function updateTextMetrics(shape, { keepCenter = false, centerOverride = null, p
   }
 
   return metrics;
+}
+
+function refreshTextSnapshotMetrics(snapshot, { fallbackStyle = null, keepCenter = false } = {}) {
+  if (!snapshot || snapshot.type !== "text") return;
+  const originalStyleRotation = snapshot.style?.rotation;
+  const originalLiveRotation = snapshot.live?.rotation;
+  const style = { ...(fallbackStyle || {}), ...(snapshot.style || {}) };
+  const live = { ...(snapshot.live || {}) };
+  const workingShape = {
+    type: "text",
+    style,
+    live,
+  };
+  const options = keepCenter ? { keepCenter: true } : { preserveOrigin: true };
+  updateTextMetrics(workingShape, options);
+  snapshot.style = workingShape.style;
+  if (originalStyleRotation !== undefined) {
+    snapshot.style.rotation = originalStyleRotation;
+  }
+  snapshot.live = workingShape.live;
+  if (originalLiveRotation !== undefined) {
+    snapshot.live.rotation = originalLiveRotation;
+  }
 }
 
 function destroyActiveTextEditorElement() {
@@ -1990,7 +2946,7 @@ function startTextEditing(shape, { focus = true, selectAll = false } = {}) {
     keepCenter,
   };
 
-  editor.style.fontFamily = getFontStack(shape.style.fontFamily || state.style.fontFamily || "Inter");
+  editor.style.fontFamily = getFontStack(shape.style.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT);
   editor.style.fontSize = `${Math.max(6, shape.style.fontSize || state.style.fontSize || 32)}px`;
 
   if (keepCenter) {
@@ -2024,7 +2980,7 @@ function repositionActiveTextEditor() {
   active.element.style.top = `${top}px`;
   active.element.style.width = `${shape.live.width}px`;
   active.element.style.height = `${shape.live.height}px`;
-  active.element.style.fontFamily = getFontStack(shape.style.fontFamily || state.style.fontFamily || "Inter");
+  active.element.style.fontFamily = getFontStack(shape.style.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT);
   active.element.style.fontSize = `${Math.max(6, shape.style.fontSize || state.style.fontSize || 32)}px`;
 }
 
@@ -2040,6 +2996,16 @@ function moveShape(shape, point, startSnapshot = state.pointer.startSnapshot) {
     shape.live.start.y = startSnapshot.start.y + dy;
     shape.live.end.x = startSnapshot.end.x + dx;
     shape.live.end.y = startSnapshot.end.y + dy;
+    if (shape.type === "line") {
+      if (startSnapshot.control) {
+        shape.live.control = {
+          x: startSnapshot.control.x + dx,
+          y: startSnapshot.control.y + dy,
+        };
+      } else {
+        delete shape.live.control;
+      }
+    }
   } else if (shape.type === "free") {
     shape.live.points = startSnapshot.points.map((pt) => ({
       x: pt.x + dx,
@@ -2059,13 +3025,49 @@ function resizeShape(shape, point) {
 
   if (shape.type === "text") {
     resizeTextShape(shape, point, start);
-  } else if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "image") {
+  } else if (shape.type === "rectangle" || shape.type === "diamond" || shape.type === "square" || shape.type === "circle" || shape.type === "image") {
     resizeRectangularShape(shape, point, start);
   } else if (shape.type === "free") {
     resizeFreeformShape(shape, point, start);
   } else if (shape.type === "image") {
     resizeRectangularShape(shape, point, start);
   }
+}
+
+function resizeGroupSelection(point) {
+  if (!point) return false;
+  const snapshots = state.pointer.multiSnapshot;
+  if (!snapshots || snapshots.size === 0) return false;
+  const startBounds = state.pointer.startBounds;
+  if (!startBounds) return false;
+
+  const center = state.pointer.startCenter || {
+    x: startBounds.x + startBounds.width / 2,
+    y: startBounds.y + startBounds.height / 2,
+  };
+  const startVector = state.pointer.startHandleVector || {
+    x: Math.max(1, startBounds.width / 2),
+    y: Math.max(1, startBounds.height / 2),
+  };
+  const currentVector = {
+    x: Math.max(1, Math.abs(point.x - center.x)),
+    y: Math.max(1, Math.abs(point.y - center.y)),
+  };
+
+  const scaleX = clampScale(currentVector.x / Math.max(1, startVector.x));
+  const scaleY = clampScale(currentVector.y / Math.max(1, startVector.y));
+
+  markHistoryChanged();
+  const styleSnapshots = state.pointer.multiStyles || new Map();
+
+  snapshots.forEach((snapshot, id) => {
+    const shape = getShapeById(id);
+    if (!shape) return;
+    const styleSnapshot = styleSnapshots.get(id) || null;
+    applyScaledSnapshotToShape(shape, snapshot, center, scaleX, scaleY, styleSnapshot);
+  });
+
+  return true;
 }
 
 function resizeRectangularShape(shape, point, startSnapshot) {
@@ -2142,6 +3144,93 @@ function resizeFreeformShape(shape, point, startSnapshot) {
   }));
 }
 
+function applyScaledSnapshotToShape(shape, snapshot, center, scaleX, scaleY, styleSnapshot) {
+  if (!shape || !snapshot) return;
+  switch (shape.type) {
+    case "line":
+    case "arrow": {
+      if (!snapshot.start || !snapshot.end) return;
+      shape.live.start = {
+        x: center.x + (snapshot.start.x - center.x) * scaleX,
+        y: center.y + (snapshot.start.y - center.y) * scaleY,
+      };
+      shape.live.end = {
+        x: center.x + (snapshot.end.x - center.x) * scaleX,
+        y: center.y + (snapshot.end.y - center.y) * scaleY,
+      };
+      if (shape.type === "line") {
+        if (snapshot.control) {
+          shape.live.control = {
+            x: center.x + (snapshot.control.x - center.x) * scaleX,
+            y: center.y + (snapshot.control.y - center.y) * scaleY,
+          };
+        } else {
+          delete shape.live.control;
+        }
+      }
+      return;
+    }
+    case "free": {
+      if (!Array.isArray(snapshot.points)) return;
+      shape.live.points = snapshot.points.map((pt) => ({
+        x: center.x + (pt.x - center.x) * scaleX,
+        y: center.y + (pt.y - center.y) * scaleY,
+      }));
+      return;
+    }
+    case "text": {
+      const width = Math.max(1, snapshot.width ?? shape.live.width ?? 0);
+      const height = Math.max(1, snapshot.height ?? shape.live.height ?? 0);
+      const snapshotCenter = {
+        x: (snapshot.x ?? shape.live.x ?? 0) + width / 2,
+        y: (snapshot.y ?? shape.live.y ?? 0) + height / 2,
+      };
+      const nextCenter = {
+        x: center.x + (snapshotCenter.x - center.x) * scaleX,
+        y: center.y + (snapshotCenter.y - center.y) * scaleY,
+      };
+      const baseStyle = styleSnapshot || shape.style || {};
+      const baseFontSize = Math.max(6, Number(baseStyle.fontSize) || state.style.fontSize || 32);
+      const uniformScale = Math.min(scaleX, scaleY);
+      const nextFontSize = Math.max(6, Math.round(baseFontSize * uniformScale));
+      shape.style.fontSize = nextFontSize;
+      const baseRotation = snapshot.rotation ?? shape.live.rotation ?? 0;
+      shape.live.rotation = baseRotation;
+      shape.style.rotation = radiansToDegrees(baseRotation);
+      updateTextMetrics(shape, { centerOverride: nextCenter });
+      return;
+    }
+    default: {
+      const width = Math.max(1, snapshot.width ?? shape.live.width ?? 0);
+      const height = Math.max(1, snapshot.height ?? shape.live.height ?? 0);
+      const snapshotCenter = {
+        x: (snapshot.x ?? shape.live.x ?? 0) + width / 2,
+        y: (snapshot.y ?? shape.live.y ?? 0) + height / 2,
+      };
+      const nextCenter = {
+        x: center.x + (snapshotCenter.x - center.x) * scaleX,
+        y: center.y + (snapshotCenter.y - center.y) * scaleY,
+      };
+      let nextWidth = Math.max(8, width * scaleX);
+      let nextHeight = Math.max(8, height * scaleY);
+      if (shape.type === "square" || shape.type === "circle") {
+        const uniform = Math.max(nextWidth, nextHeight);
+        nextWidth = uniform;
+        nextHeight = uniform;
+      }
+      const baseRotation = snapshot.rotation ?? shape.live.rotation ?? 0;
+      shape.live.rotation = baseRotation;
+      if (shape.style) {
+        shape.style.rotation = radiansToDegrees(baseRotation);
+      }
+      shape.live.width = nextWidth;
+      shape.live.height = nextHeight;
+      shape.live.x = nextCenter.x - nextWidth / 2;
+      shape.live.y = nextCenter.y - nextHeight / 2;
+    }
+  }
+}
+
 function resizeLineEndpoint(shape, point, mode) {
   if (!shape) return;
   markHistoryChanged();
@@ -2149,6 +3238,40 @@ function resizeLineEndpoint(shape, point, mode) {
     shape.live.start = { x: point.x, y: point.y };
   } else {
     shape.live.end = { x: point.x, y: point.y };
+  }
+  if (shape.type === "line") {
+    const snapshot = state.pointer.startSnapshot;
+    if (snapshot && snapshot.control && snapshot.start && snapshot.end) {
+      const preservedOffset = getLineBendOffset(snapshot.start, snapshot.end, snapshot.control);
+      const clamped = clampLineBendOffset(shape.live.start, shape.live.end, preservedOffset);
+      if (Math.abs(clamped) < 1.2) {
+        delete shape.live.control;
+      } else {
+        shape.live.control = getLineControlFromOffset(shape.live.start, shape.live.end, clamped);
+      }
+    } else if (shape.live.control) {
+      const offset = getLineBendOffset(shape.live.start, shape.live.end, shape.live.control);
+      const clamped = clampLineBendOffset(shape.live.start, shape.live.end, offset);
+      if (Math.abs(clamped) < 1.2) {
+        delete shape.live.control;
+      } else {
+        shape.live.control = getLineControlFromOffset(shape.live.start, shape.live.end, clamped);
+      }
+    }
+  }
+}
+
+function bendLineShape(shape, point) {
+  if (!shape || shape.type !== "line") return;
+  const { start, end } = shape.live || {};
+  if (!start || !end) return;
+  markHistoryChanged();
+  const offset = getLineBendOffsetFromPoint(start, end, point);
+  const clamped = clampLineBendOffset(start, end, offset);
+  if (Math.abs(clamped) < 1.2) {
+    delete shape.live.control;
+  } else {
+    shape.live.control = getLineControlFromOffset(start, end, clamped);
   }
 }
 
@@ -2163,7 +3286,7 @@ function rotateShape(shape, point) {
   const currentAngle = Math.atan2(point.y - center.y, point.x - center.x);
   const delta = currentAngle - startAngle;
 
-  if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "text" || shape.type === "image") {
+  if (shape.type === "rectangle" || shape.type === "diamond" || shape.type === "square" || shape.type === "circle" || shape.type === "text" || shape.type === "image") {
     shape.live.rotation = normalizeAngle(baseRotation + delta);
     shape.live.width = snapshot.width;
     shape.live.height = snapshot.height;
@@ -2173,8 +3296,94 @@ function rotateShape(shape, point) {
   } else if (shape.type === "line" || shape.type === "arrow") {
     shape.live.start = rotatePoint(snapshot.start, center, delta);
     shape.live.end = rotatePoint(snapshot.end, center, delta);
+    if (shape.type === "line") {
+      if (snapshot.control) {
+        shape.live.control = rotatePoint(snapshot.control, center, delta);
+      } else {
+        delete shape.live.control;
+      }
+    }
   } else if (shape.type === "free") {
     shape.live.points = snapshot.points.map((pt) => rotatePoint(pt, center, delta));
+  }
+}
+
+function rotateGroupSelection(point) {
+  if (!point) return false;
+  const snapshots = state.pointer.multiSnapshot;
+  if (!snapshots || snapshots.size === 0) return false;
+  const center = state.pointer.startCenter;
+  if (!center) return false;
+  const startAngle = state.pointer.rotationStartAngle ?? 0;
+  const currentAngle = Math.atan2(point.y - center.y, point.x - center.x);
+  if (!Number.isFinite(currentAngle)) return false;
+  const delta = currentAngle - startAngle;
+
+  markHistoryChanged();
+  snapshots.forEach((snapshot, id) => {
+    const shape = getShapeById(id);
+    if (!shape) return;
+    applyRotationSnapshotToShape(shape, snapshot, center, delta);
+  });
+
+  return true;
+}
+
+function applyRotationSnapshotToShape(shape, snapshot, center, delta) {
+  if (!shape || !snapshot) return;
+  switch (shape.type) {
+    case "line":
+    case "arrow": {
+      if (!snapshot.start || !snapshot.end) return;
+      shape.live.start = rotatePoint(snapshot.start, center, delta);
+      shape.live.end = rotatePoint(snapshot.end, center, delta);
+      if (shape.type === "line") {
+        if (snapshot.control) {
+          shape.live.control = rotatePoint(snapshot.control, center, delta);
+        } else {
+          delete shape.live.control;
+        }
+      }
+      return;
+    }
+    case "free": {
+      if (!Array.isArray(snapshot.points)) return;
+      shape.live.points = snapshot.points.map((pt) => rotatePoint(pt, center, delta));
+      return;
+    }
+    case "text": {
+      const width = Math.max(1, snapshot.width ?? shape.live.width ?? 0);
+      const height = Math.max(1, snapshot.height ?? shape.live.height ?? 0);
+      const snapshotCenter = {
+        x: (snapshot.x ?? shape.live.x ?? 0) + width / 2,
+        y: (snapshot.y ?? shape.live.y ?? 0) + height / 2,
+      };
+      const nextCenter = rotatePoint(snapshotCenter, center, delta);
+      updateTextMetrics(shape, { centerOverride: nextCenter });
+      const baseRotation = snapshot.rotation ?? shape.live.rotation ?? 0;
+      shape.live.rotation = normalizeAngle(baseRotation + delta);
+      shape.style.rotation = radiansToDegrees(shape.live.rotation);
+      return;
+    }
+    default: {
+      const width = Math.max(1, snapshot.width ?? shape.live.width ?? 0);
+      const height = Math.max(1, snapshot.height ?? shape.live.height ?? 0);
+      const snapshotCenter = {
+        x: (snapshot.x ?? shape.live.x ?? 0) + width / 2,
+        y: (snapshot.y ?? shape.live.y ?? 0) + height / 2,
+      };
+      const nextCenter = rotatePoint(snapshotCenter, center, delta);
+      const baseRotation = snapshot.rotation ?? shape.live.rotation ?? 0;
+      const nextRotation = normalizeAngle(baseRotation + delta);
+      shape.live.rotation = nextRotation;
+      if (shape.style) {
+        shape.style.rotation = radiansToDegrees(nextRotation);
+      }
+      shape.live.width = width;
+      shape.live.height = height;
+      shape.live.x = nextCenter.x - width / 2;
+      shape.live.y = nextCenter.y - height / 2;
+    }
   }
 }
 
@@ -2186,9 +3395,22 @@ function detectLineEndpointHandle(shape, point) {
   return null;
 }
 
+function detectLineBendHandle(shape, point) {
+  if (!shape || shape.type !== "line") return null;
+  const position = getLineBendHandlePosition(shape);
+  if (!position) return null;
+  const radius = Math.max(14, (shape.style?.strokeWidth || 1) + 8);
+  if (distance(point, position) > radius) return null;
+  return {
+    type: "line-bend",
+    position,
+    offset: getLineBendOffset(shape.live.start, shape.live.end, shape.live.control),
+  };
+}
+
 function detectResizeHandle(shape, point) {
   const size = 12;
-  if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "image" || shape.type === "text") {
+  if (shape.type === "rectangle" || shape.type === "diamond" || shape.type === "square" || shape.type === "circle" || shape.type === "image" || shape.type === "text") {
     const center = getShapeCenter(shape);
     const rotation = shape.live.rotation || 0;
     const localVector = { x: shape.live.width / 2, y: shape.live.height / 2 };
@@ -2251,31 +3473,20 @@ function getRotationHandlePosition(shape) {
   if (!shape) return null;
   const center = getShapeCenter(shape);
   if (!center) return null;
-  const offset = 36;
 
-  if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "text" || shape.type === "image") {
-    const rotation = shape.live.rotation || 0;
-    const halfHeight = shape.live.height / 2;
-    const anchorVec = rotateVector({ x: 0, y: -halfHeight }, rotation);
-    const handleVec = rotateVector({ x: 0, y: -(halfHeight + offset) }, rotation);
+  if (shape.type === "rectangle" || shape.type === "diamond" || shape.type === "square" || shape.type === "circle" || shape.type === "text" || shape.type === "image") {
     return {
-      position: { x: center.x + handleVec.x, y: center.y + handleVec.y },
-      anchor: { x: center.x + anchorVec.x, y: center.y + anchorVec.y },
+      position: center,
+      anchor: null,
       center,
       bounds: { x: shape.live.x, y: shape.live.y, width: shape.live.width, height: shape.live.height },
     };
   }
 
   if (shape.type === "line" || shape.type === "arrow") {
-    const angle = Math.atan2(shape.live.end.y - shape.live.start.y, shape.live.end.x - shape.live.start.x);
-    const normal = angle - Math.PI / 2;
-    const position = {
-      x: center.x + Math.cos(normal) * offset,
-      y: center.y + Math.sin(normal) * offset,
-    };
     return {
-      position,
-      anchor: center,
+      position: center,
+      anchor: null,
       center,
       bounds: getShapeBounds(shape),
     };
@@ -2302,6 +3513,7 @@ function updateTempShape(point) {
   markHistoryChanged();
   switch (shape.type) {
     case "rectangle":
+    case "diamond":
     case "square": {
       const dx = point.x - state.pointer.start.x;
       const dy = point.y - state.pointer.start.y;
@@ -2396,18 +3608,25 @@ function commitShapeChange(shape) {
 }
 
 function createShape(type, start, end) {
+  const isConnector = type === "line" || type === "arrow";
   const baseStyle = {
     fill: state.style.fill,
     stroke: state.style.stroke,
     strokeWidth: state.style.strokeWidth,
-    sketchLevel: state.style.sketchLevel || 0,
+    strokeStyle: normalizeStrokeStyle(state.style.strokeStyle || DEFAULT_STROKE_STYLE),
+    sketchLevel: isConnector ? 0 : state.style.sketchLevel || 0,
     arrowStart: Boolean(state.style.arrowStart),
     arrowEnd: state.style.arrowEnd !== undefined ? Boolean(state.style.arrowEnd) : true,
     opacity: state.style.opacity ?? 1,
-    fontFamily: state.style.fontFamily || "Inter",
+    fontFamily: state.style.fontFamily || DEFAULT_TEXT_FONT,
     fontSize: Number(state.style.fontSize) || 32,
     rotation: state.style.rotation || 0,
   };
+
+  if (!isConnector) {
+    baseStyle.fillStyle = normalizeFillStyle(state.style.fillStyle || DEFAULT_FILL_STYLE);
+    baseStyle.edgeStyle = normalizeEdgeStyle(state.style.edgeStyle || DEFAULT_EDGE_STYLE);
+  }
 
   const shape = {
     id: shapeIdCounter++,
@@ -2419,8 +3638,11 @@ function createShape(type, start, end) {
     isVisible: true,
   };
 
+  ensureStyleHasFillStyle(shape.style, type);
+
   switch (type) {
     case "rectangle":
+    case "diamond":
     case "square": {
       shape.live = {
         x: start.x,
@@ -2475,7 +3697,7 @@ function createShape(type, start, end) {
       const fontSize = Math.max(6, Number(state.style.fontSize) || 32);
       const initialRotationDeg = state.style.rotation || 0;
       const initialRotationRad = degreesToRadians(initialRotationDeg);
-      shape.style.fontFamily = state.style.fontFamily || "Inter";
+  shape.style.fontFamily = state.style.fontFamily || DEFAULT_TEXT_FONT;
       shape.style.fontSize = fontSize;
       shape.style.stroke = "transparent";
       shape.style.strokeWidth = 0;
@@ -2523,6 +3745,15 @@ function isPointInsideShape(shape, point) {
         Math.abs(local.x) <= shape.live.width / 2 && Math.abs(local.y) <= shape.live.height / 2
       );
     }
+    case "diamond": {
+      const center = getShapeCenter(shape);
+      const rotation = shape.live.rotation || 0;
+      const local = toLocalPoint(point, center, rotation);
+      const halfWidth = Math.max(1, shape.live.width / 2);
+      const halfHeight = Math.max(1, shape.live.height / 2);
+      const normalized = Math.abs(local.x) / halfWidth + Math.abs(local.y) / halfHeight;
+      return normalized <= 1;
+    }
     case "circle": {
       const radius = shape.live.width / 2;
       const center = {
@@ -2533,7 +3764,11 @@ function isPointInsideShape(shape, point) {
     }
     case "line":
     case "arrow": {
-      const closeness = distanceToSegment(point, shape.live.start, shape.live.end);
+      const { start, end, control } = shape.live || {};
+      if (!start || !end) return false;
+      const closeness = shape.type === "line" && control
+        ? distanceToQuadratic(point, start, control, end)
+        : distanceToSegment(point, start, end);
       return closeness <= Math.max(10, shape.style.strokeWidth + 4);
     }
     case "free": {
@@ -2578,6 +3813,7 @@ function setSelectedShapes(shapes, { primaryId } = {}) {
   if (state.selectedIds.size === 0) {
     state.selection = null;
     state.timeline.selectedKeyframeTime = null;
+    state.timeline.selectedKeyframeShapeId = null;
   } else if (primaryId && state.selectedIds.has(primaryId)) {
     state.selection = list.find((shape) => shape.id === primaryId) || null;
   } else {
@@ -2588,16 +3824,45 @@ function setSelectedShapes(shapes, { primaryId } = {}) {
     const selectedTime = state.timeline.selectedKeyframeTime;
     if (typeof selectedTime === "number") {
       const match = state.selection.keyframes.some((keyframe) => Math.abs(keyframe.time - selectedTime) < KEYFRAME_EPSILON);
-      if (!match) {
+      if (match) {
+        state.timeline.selectedKeyframeShapeId = state.selection.id;
+      } else {
         state.timeline.selectedKeyframeTime = null;
+        state.timeline.selectedKeyframeShapeId = null;
       }
+    } else {
+      state.timeline.selectedKeyframeShapeId = null;
     }
   } else {
     state.timeline.selectedKeyframeTime = null;
+    state.timeline.selectedKeyframeShapeId = null;
   }
 
   setActiveGroupId(resolveSelectedGroupId());
   refreshSelectionUI();
+}
+
+function selectAllShapes({ focusLast = true } = {}) {
+  const shapes = Array.isArray(state.shapes) ? state.shapes.filter(Boolean) : [];
+  if (shapes.length === 0) {
+    setSelectedShapes([]);
+    return false;
+  }
+  const primaryId = focusLast ? shapes[shapes.length - 1]?.id : shapes[0]?.id;
+  if (primaryId) {
+    setSelectedShapes(shapes, { primaryId });
+  } else {
+    setSelectedShapes(shapes);
+  }
+  return true;
+}
+
+function clearSelection() {
+  if (!state.selectedIds || state.selectedIds.size === 0) {
+    return false;
+  }
+  setSelectedShapes([]);
+  return true;
 }
 
 function updateMarqueeOverlay(rect) {
@@ -2949,25 +4214,17 @@ function refreshSelectionUI() {
     if (elements.selectionLabel) {
       elements.selectionLabel.textContent = "No shape selected";
     }
-    if (elements.keyframeList) {
-      elements.keyframeList.innerHTML = "";
-    }
-    renderTimelineTrackMarkers();
   } else if (selectionSize === 1) {
     if (elements.selectionLabel) {
       elements.selectionLabel.textContent = `${capitalize(state.selection.type)} selected (#${state.selection.id})`;
     }
-    renderKeyframeList();
   } else {
     if (elements.selectionLabel) {
       elements.selectionLabel.textContent = `${selectionSize} shapes selected`;
     }
-    if (elements.keyframeList) {
-      elements.keyframeList.innerHTML = "";
-    }
-    renderTimelineTrackMarkers();
   }
 
+  renderKeyframeList();
   syncSelectionInputs();
   syncArrowEndingUI();
 }
@@ -3071,6 +4328,93 @@ function removeShapeFromCurrentGroup(shape) {
   removeShapeFromGroup(shape, shape.groupId);
 }
 
+function groupSelectedShapes() {
+  if (!state.selectedIds || state.selectedIds.size < 2) {
+    return false;
+  }
+
+  const ids = Array.from(state.selectedIds);
+  const sharedGroupId = getSharedGroupId(ids);
+  if (sharedGroupId && state.groups[sharedGroupId] && state.groups[sharedGroupId].size === ids.length) {
+    return false;
+  }
+
+  const groupId = `group-${groupIdCounter++}`;
+  const memberSet = new Set();
+
+  ids.forEach((id) => {
+    const shape = getShapeById(id);
+    if (!shape) return;
+    removeShapeFromCurrentGroup(shape);
+    shape.groupId = groupId;
+    memberSet.add(shape.id);
+  });
+
+  if (memberSet.size < 2) {
+    memberSet.forEach((id) => {
+      const shape = getShapeById(id);
+      if (shape) {
+        delete shape.groupId;
+      }
+    });
+    return false;
+  }
+
+  state.groups[groupId] = memberSet;
+  setActiveGroupId(groupId);
+
+  const shapes = Array.from(memberSet)
+    .map((memberId) => getShapeById(memberId))
+    .filter(Boolean);
+  if (shapes.length === 0) {
+    return false;
+  }
+
+  setSelectedShapes(shapes, { primaryId: shapes[shapes.length - 1]?.id });
+  return true;
+}
+
+function ungroupSelectedShapes() {
+  const groupId = resolveSelectedGroupId();
+  if (!groupId) {
+    return false;
+  }
+
+  const members = state.groups[groupId];
+  if (!members || members.size < 2) {
+    return false;
+  }
+
+  const shapes = Array.from(members)
+    .map((id) => getShapeById(id))
+    .filter(Boolean);
+  if (shapes.length === 0) {
+    delete state.groups[groupId];
+    if (state.activeGroupId === groupId) {
+      setActiveGroupId(null);
+    } else {
+      syncActiveGroupState();
+    }
+    return false;
+  }
+
+  shapes.forEach((shape) => {
+    if (shape && shape.groupId === groupId) {
+      delete shape.groupId;
+    }
+  });
+
+  delete state.groups[groupId];
+  if (state.activeGroupId === groupId) {
+    setActiveGroupId(null);
+  } else {
+    syncActiveGroupState();
+  }
+  pruneEmptyGroups();
+  setSelectedShapes(shapes, { primaryId: shapes[shapes.length - 1]?.id });
+  return true;
+}
+
 function pruneEmptyGroups() {
   const entries = Object.entries(state.groups || {});
   entries.forEach(([groupId, members]) => {
@@ -3171,6 +4515,7 @@ function deleteSelectedShapes() {
   pruneEmptyGroups();
   setActiveGroupId(null);
   state.timeline.selectedKeyframeTime = null;
+  state.timeline.selectedKeyframeShapeId = null;
   resetPointerInteraction();
   state.pointer.down = false;
   refreshSelectionUI();
@@ -3285,31 +4630,71 @@ function pasteClipboardItems() {
   return Boolean(last);
 }
 
-function createImageShapeFromSourceInternal(src, { select = true, addHistory = true } = {}) {
+function createImageShapeFromSourceInternal(src, options = {}) {
   if (!src) return null;
+  const {
+    select = true,
+    addHistory = true,
+    liveRect = null,
+    styleOverrides = null,
+  } = options;
+
   if (addHistory) {
     pushHistorySnapshot("create-image");
   }
   closeAllContextMenus();
 
+  const stageWidth = Number.isFinite(state?.stage?.width) ? state.stage.width : 0;
+  const stageHeight = Number.isFinite(state?.stage?.height) ? state.stage.height : 0;
+  const defaultLive = {
+    x: stageWidth / 2 - 96,
+    y: stageHeight / 2 - 96,
+    width: 192,
+    height: 192,
+    rotation: 0,
+  };
+
+  const hasCustomRect = liveRect && typeof liveRect === "object";
+  const resolvedRect = hasCustomRect
+    ? {
+        x: Number.isFinite(liveRect.x) ? liveRect.x : defaultLive.x,
+        y: Number.isFinite(liveRect.y) ? liveRect.y : defaultLive.y,
+        width: Math.max(2, Number.isFinite(liveRect.width) ? liveRect.width : defaultLive.width),
+        height: Math.max(2, Number.isFinite(liveRect.height) ? liveRect.height : defaultLive.height),
+        rotation: Number.isFinite(liveRect.rotation) ? liveRect.rotation : defaultLive.rotation,
+      }
+    : defaultLive;
+
   const now = state.timeline.current;
+  const baseStyle = {
+    fill: state.style.fill,
+    fillStyle: normalizeFillStyle(state.style.fillStyle || DEFAULT_FILL_STYLE),
+    stroke: state.style.stroke,
+    strokeWidth: state.style.strokeWidth,
+    sketchLevel: 0,
+    opacity: state.style.opacity ?? 1,
+    rotation: Number.isFinite(resolvedRect.rotation) ? resolvedRect.rotation : 0,
+  };
+
+  if (styleOverrides && typeof styleOverrides === "object") {
+    if (styleOverrides.opacity !== undefined) {
+      const numericOpacity = Number(styleOverrides.opacity);
+      if (Number.isFinite(numericOpacity)) {
+        baseStyle.opacity = clampToRange(numericOpacity, 0, 1);
+      }
+    }
+  }
+
   const shape = {
     id: shapeIdCounter++,
     type: "image",
-    style: {
-      fill: state.style.fill,
-      stroke: state.style.stroke,
-      strokeWidth: state.style.strokeWidth,
-      sketchLevel: 0,
-      opacity: state.style.opacity ?? 1,
-      rotation: 0,
-    },
+    style: baseStyle,
     live: {
-      x: state.stage.width / 2 - 96,
-      y: state.stage.height / 2 - 96,
-      width: 192,
-      height: 192,
-      rotation: 0,
+      x: resolvedRect.x,
+      y: resolvedRect.y,
+      width: resolvedRect.width,
+      height: resolvedRect.height,
+      rotation: Number.isFinite(resolvedRect.rotation) ? resolvedRect.rotation : 0,
     },
     keyframes: [],
     birthTime: now,
@@ -3320,22 +4705,34 @@ function createImageShapeFromSourceInternal(src, { select = true, addHistory = t
     },
   };
 
+  ensureStyleHasFillStyle(shape.style, shape.type);
+
+  const shouldAutoSizeOnLoad = !hasCustomRect;
+
   shape.asset.image.addEventListener("load", () => {
+    if (!shouldAutoSizeOnLoad) {
+      applyTimelineState();
+      return;
+    }
     const img = shape.asset.image;
     const aspect = img && img.height !== 0 ? img.width / img.height : 1;
-    const baseWidth = Math.min(state.stage.width * 0.4, Math.max(96, img.width || 0));
+    const baseWidth = Math.min(stageWidth * 0.4, Math.max(96, img.width || 0));
     const width = baseWidth;
     const height = aspect !== 0 ? baseWidth / aspect : baseWidth;
     shape.live.width = width;
     shape.live.height = height;
-    shape.live.x = state.stage.width / 2 - width / 2;
-    shape.live.y = state.stage.height / 2 - height / 2;
+    shape.live.x = stageWidth / 2 - width / 2;
+    shape.live.y = stageHeight / 2 - height / 2;
     writeKeyframe(shape, state.timeline.current, { markSelected: false });
   });
   shape.asset.image.addEventListener("error", () => {
     // Leave the shape in place even if the image fails to load.
   });
   shape.asset.image.src = src;
+
+  if (!shouldAutoSizeOnLoad) {
+    confineShapeToStage(shape, stageWidth, stageHeight);
+  }
 
   state.shapes.push(shape);
   ensureBaseKeyframe(shape, now);
@@ -3365,15 +4762,827 @@ function pasteImageBlob(blob) {
   }
 }
 
-function maybePasteImageFromClipboard(clipboardData) {
+function pasteSvgContent(svgText) {
+  if (typeof svgText !== "string") return false;
+  const trimmed = svgText.trim();
+  if (!trimmed) return false;
+  const match = trimmed.match(/<svg[\s\S]*<\/svg>/i);
+  if (!match) return false;
+  const markup = match[0];
+
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(markup, "image/svg+xml");
+  const svgRoot = doc.documentElement;
+  if (!svgRoot || svgRoot.nodeName.toLowerCase() !== "svg") {
+    return false;
+  }
+
+  const sandbox = document.createElement("div");
+  sandbox.style.cssText = "position:absolute;left:-9999px;top:-9999px;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;";
+  const measuringSvg = svgRoot.cloneNode(true);
+  sandbox.appendChild(measuringSvg);
+  document.body.appendChild(sandbox);
+
+  const fragmentAttr = "data-animator-fragment-id";
+  const candidateSelector = "path,rect,circle,ellipse,line,polyline,polygon,text,image,use";
+  const skipAncestorSelector = "defs,clipPath,mask,pattern,marker,symbol";
+  const fragmentRecords = [];
+
+  const safeGetBBox = (node) => {
+    try {
+      if (typeof node.getBBox === "function") {
+        return node.getBBox();
+      }
+      return null;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const computeNodeOpacity = (node) => {
+    if (!(node instanceof Element)) {
+      return 1;
+    }
+    let resolved = Number.NaN;
+    try {
+      const computed = window.getComputedStyle(node);
+      if (computed && typeof computed.opacity === "string") {
+        const numeric = parseFloat(computed.opacity);
+        if (Number.isFinite(numeric)) {
+          resolved = numeric;
+        }
+      }
+    } catch (error) {
+      // Ignore computed style lookup issues.
+    }
+    if (!Number.isFinite(resolved)) {
+      const attrValue = typeof node.getAttribute === "function" ? node.getAttribute("opacity") : null;
+      if (attrValue !== null && attrValue !== "") {
+        const numeric = parseFloat(attrValue);
+        if (Number.isFinite(numeric)) {
+          resolved = numeric;
+        }
+      }
+    }
+    if (!Number.isFinite(resolved)) {
+      resolved = 1;
+    }
+    return clampToRange(resolved, 0, 1);
+  };
+
+  const findFragmentRoot = (node) => {
+    let current = node;
+    while (current && current !== measuringSvg) {
+      if (current instanceof SVGElement) {
+        const tag = current.tagName.toLowerCase();
+        if (tag === "g") {
+          if (current.hasAttribute("transform") || current.hasAttribute("data-testid") || current.hasAttribute("data-id") || current.hasAttribute("data-shape")) {
+            return current;
+          }
+        }
+      }
+      const parent = current.parentElement;
+      if (!parent) {
+        break;
+      }
+      if (parent === measuringSvg) {
+        return current;
+      }
+      current = parent;
+    }
+    return current;
+  };
+
+  const rootMap = new Map();
+
+  const svgOpacity = computeNodeOpacity(measuringSvg);
+
+  const fallbackToImage = (styleOverrides = null) => {
+    try {
+      const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+      const options = {};
+      const resolvedOverrides = styleOverrides && typeof styleOverrides === "object" ? styleOverrides : null;
+      if (resolvedOverrides) {
+        options.styleOverrides = resolvedOverrides;
+      } else if (svgOpacity < 1) {
+        options.styleOverrides = { opacity: svgOpacity };
+      }
+      const created = createImageShapeFromSourceInternal(dataUrl, options);
+      return Boolean(created);
+    } catch (error) {
+      return false;
+    }
+  };
+
+  const cleanup = () => {
+    rootMap.forEach((record, node) => {
+      if (node) {
+        node.removeAttribute(fragmentAttr);
+      }
+    });
+    if (sandbox.parentNode) {
+      sandbox.parentNode.removeChild(sandbox);
+    }
+  };
+
+  Array.from(measuringSvg.querySelectorAll(candidateSelector)).forEach((node) => {
+    if (!(node instanceof SVGElement)) return;
+    if (node.closest(skipAncestorSelector)) return;
+    const style = window.getComputedStyle(node);
+    if (style && (style.display === "none" || style.visibility === "hidden")) {
+      return;
+    }
+
+    const root = findFragmentRoot(node);
+    if (!(root instanceof SVGElement)) return;
+    if (root.closest(skipAncestorSelector)) return;
+
+    if (!rootMap.has(root)) {
+      const bbox = safeGetBBox(root);
+      if (!bbox) return;
+      const width = Number.isFinite(bbox.width) ? bbox.width : 0;
+      const height = Number.isFinite(bbox.height) ? bbox.height : 0;
+      if (width === 0 && height === 0) return;
+      const marker = `fragment-${Date.now()}-${rootMap.size}`;
+      root.setAttribute(fragmentAttr, marker);
+      rootMap.set(root, {
+        node: root,
+        marker,
+        order: rootMap.size,
+        bounds: {
+          x: Number.isFinite(bbox.x) ? bbox.x : 0,
+          y: Number.isFinite(bbox.y) ? bbox.y : 0,
+          width: Math.max(width, 0),
+          height: Math.max(height, 0),
+        },
+        opacity: computeNodeOpacity(root),
+      });
+    }
+  });
+
+  rootMap.forEach((record) => {
+    fragmentRecords.push(record);
+  });
+
+  fragmentRecords.sort((a, b) => {
+    const orderA = Number.isFinite(a.order) ? a.order : 0;
+    const orderB = Number.isFinite(b.order) ? b.order : 0;
+    return orderA - orderB;
+  });
+
+  try {
+    if (fragmentRecords.length === 0) {
+      return fallbackToImage();
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    fragmentRecords.forEach((info) => {
+      const { x, y, width, height } = info.bounds;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + width);
+      maxY = Math.max(maxY, y + height);
+    });
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return fallbackToImage();
+    }
+
+    const globalWidth = Math.max(1, maxX - minX);
+    const globalHeight = Math.max(1, maxY - minY);
+    const stageWidth = Number.isFinite(state?.stage?.width) ? state.stage.width : 0;
+    const stageHeight = Number.isFinite(state?.stage?.height) ? state.stage.height : 0;
+    const maxWidth = stageWidth > 0 ? stageWidth * 0.6 : globalWidth;
+    const maxHeight = stageHeight > 0 ? stageHeight * 0.6 : globalHeight;
+    const minTargetSize = 96;
+
+    let scale = 1;
+    if (globalWidth > 0 && maxWidth > 0) {
+      scale = Math.min(scale, maxWidth / globalWidth);
+    }
+    if (globalHeight > 0 && maxHeight > 0) {
+      scale = Math.min(scale, maxHeight / globalHeight);
+    }
+    if (!Number.isFinite(scale) || scale <= 0) {
+      scale = 1;
+    }
+
+    if (globalWidth > 0 && globalWidth * scale < minTargetSize) {
+      const enlarge = maxWidth > 0 ? Math.min(maxWidth / globalWidth, minTargetSize / globalWidth) : minTargetSize / globalWidth;
+      if (enlarge > scale) {
+        scale = enlarge;
+      }
+    }
+    if (globalHeight > 0 && globalHeight * scale < minTargetSize) {
+      const enlarge = maxHeight > 0 ? Math.min(maxHeight / globalHeight, minTargetSize / globalHeight) : minTargetSize / globalHeight;
+      if (enlarge > scale) {
+        scale = enlarge;
+      }
+    }
+
+    if (!Number.isFinite(scale) || scale <= 0) {
+      scale = 1;
+    }
+
+    const stageCenterX = stageWidth / 2;
+    const stageCenterY = stageHeight / 2;
+    const groupCenterX = minX + globalWidth / 2;
+    const groupCenterY = minY + globalHeight / 2;
+    const offsetX = stageCenterX - groupCenterX * scale;
+    const offsetY = stageCenterY - groupCenterY * scale;
+
+    const serializer = new XMLSerializer();
+    const createdIds = [];
+
+    pushHistorySnapshot("paste-svg");
+
+    fragmentRecords.forEach((info) => {
+      const singleSvg = measuringSvg.cloneNode(true);
+      const survivors = Array.from(singleSvg.querySelectorAll(`[${fragmentAttr}]`));
+      survivors.forEach((element) => {
+        if (element.getAttribute(fragmentAttr) !== info.marker) {
+          element.remove();
+        }
+      });
+
+      const target = singleSvg.querySelector(`[${fragmentAttr}="${info.marker}"]`);
+      Array.from(singleSvg.children).forEach((child) => {
+        if (child.tagName && child.tagName.toLowerCase() === "defs") {
+          return;
+        }
+        if (!child.contains(target) && child !== target) {
+          child.remove();
+        }
+      });
+      if (target) {
+        target.removeAttribute(fragmentAttr);
+      }
+
+      const bounds = info.bounds;
+      const rawWidth = Math.max(bounds.width, 1);
+      const rawHeight = Math.max(bounds.height, 1);
+      const viewBoxX = Number.isFinite(bounds.x) ? bounds.x : 0;
+      const viewBoxY = Number.isFinite(bounds.y) ? bounds.y : 0;
+      singleSvg.setAttribute("viewBox", `${viewBoxX} ${viewBoxY} ${rawWidth} ${rawHeight}`);
+      singleSvg.setAttribute("width", `${rawWidth}`);
+      singleSvg.setAttribute("height", `${rawHeight}`);
+      singleSvg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+      singleSvg.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:xlink", "http://www.w3.org/1999/xlink");
+      singleSvg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+      const markupFragment = serializer.serializeToString(singleSvg);
+      const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markupFragment)}`;
+
+      const scaledWidth = Math.max(bounds.width * scale, 2);
+      const scaledHeight = Math.max(bounds.height * scale, 2);
+      const liveRect = {
+        x: offsetX + bounds.x * scale,
+        y: offsetY + bounds.y * scale,
+        width: scaledWidth,
+        height: scaledHeight,
+        rotation: 0,
+      };
+
+      const styleOverrides = Number.isFinite(info.opacity) ? { opacity: info.opacity } : null;
+      const imageOptions = {
+        select: false,
+        addHistory: false,
+        liveRect,
+      };
+      if (styleOverrides) {
+        imageOptions.styleOverrides = styleOverrides;
+      }
+
+      const created = createImageShapeFromSourceInternal(dataUrl, imageOptions);
+
+      if (created && Number.isFinite(created.id)) {
+        createdIds.push(created.id);
+      }
+    });
+
+    if (createdIds.length === 0) {
+      return fallbackToImage();
+    }
+
+    const shapesToSelect = createdIds
+      .map((id) => getShapeById(id))
+      .filter(Boolean);
+    if (shapesToSelect.length > 0) {
+      setSelectedShapes(shapesToSelect, { primaryId: createdIds[createdIds.length - 1] });
+    } else {
+      refreshSelectionUI();
+    }
+    return true;
+  } finally {
+    cleanup();
+  }
+}
+
+function tryPasteExcalidrawText(text) {
+  if (typeof text !== "string") return false;
+  const trimmed = text.trim();
+  if (!trimmed || !trimmed.startsWith("{")) return false;
+  if (!trimmed.includes("\"excalidraw/clipboard\"")) return false;
+  let payload = null;
+  try {
+    payload = JSON.parse(trimmed);
+  } catch (error) {
+    return false;
+  }
+  return pasteExcalidrawClipboardPayload(payload);
+}
+
+function pasteExcalidrawClipboardPayload(payload) {
+  if (!payload || payload.type !== "excalidraw/clipboard") return false;
+  const elements = Array.isArray(payload.elements)
+    ? payload.elements.filter((element) => element && !element.isDeleted)
+    : [];
+  if (elements.length === 0) return false;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  elements.forEach((element) => {
+    const x = Number.isFinite(element.x) ? element.x : 0;
+    const y = Number.isFinite(element.y) ? element.y : 0;
+    const width = Number.isFinite(element.width) ? element.width : 0;
+    const height = Number.isFinite(element.height) ? element.height : 0;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + width);
+    maxY = Math.max(maxY, y + height);
+  });
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return false;
+  }
+
+  const globalWidth = Math.max(1, maxX - minX);
+  const globalHeight = Math.max(1, maxY - minY);
+  const stageWidth = Number.isFinite(state?.stage?.width) ? state.stage.width : 0;
+  const stageHeight = Number.isFinite(state?.stage?.height) ? state.stage.height : 0;
+  const maxWidth = stageWidth > 0 ? stageWidth * 0.6 : globalWidth;
+  const maxHeight = stageHeight > 0 ? stageHeight * 0.6 : globalHeight;
+  const minTargetSize = 96;
+
+  let scale = 1;
+  if (globalWidth > 0 && maxWidth > 0) {
+    scale = Math.min(scale, maxWidth / globalWidth);
+  }
+  if (globalHeight > 0 && maxHeight > 0) {
+    scale = Math.min(scale, maxHeight / globalHeight);
+  }
+  if (!Number.isFinite(scale) || scale <= 0) {
+    scale = 1;
+  }
+
+  if (globalWidth > 0 && globalWidth * scale < minTargetSize) {
+    const enlarge = maxWidth > 0 ? Math.min(maxWidth / globalWidth, minTargetSize / globalWidth) : minTargetSize / globalWidth;
+    if (enlarge > scale) {
+      scale = enlarge;
+    }
+  }
+  if (globalHeight > 0 && globalHeight * scale < minTargetSize) {
+    const enlarge = maxHeight > 0 ? Math.min(maxHeight / globalHeight, minTargetSize / globalHeight) : minTargetSize / globalHeight;
+    if (enlarge > scale) {
+      scale = enlarge;
+    }
+  }
+
+  if (!Number.isFinite(scale) || scale <= 0) {
+    scale = 1;
+  }
+
+  const offsetX = stageWidth > 0 ? stageWidth / 2 - (globalWidth * scale) / 2 : 0;
+  const offsetY = stageHeight > 0 ? stageHeight / 2 - (globalHeight * scale) / 2 : 0;
+
+  const context = { scale, offsetX, offsetY, minX, minY, stageWidth, stageHeight };
+  const plans = elements
+    .map((element, index) => {
+      const plan = createExcalidrawElementPlan(element, context);
+      if (!plan) return null;
+      return { ...plan, order: index };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.order - b.order);
+
+  if (plans.length === 0) {
+    return false;
+  }
+
+  pushHistorySnapshot("paste-excalidraw");
+  const createdShapes = [];
+  const now = state.timeline.current;
+
+  plans.forEach((plan) => {
+    if (plan.kind === "shape") {
+      const shape = {
+        id: shapeIdCounter++,
+        type: plan.payload.type,
+        style: { ...plan.payload.style },
+        live: { ...plan.payload.live },
+        keyframes: [],
+        birthTime: now,
+        isVisible: true,
+      };
+      if (plan.payload.text !== undefined) {
+        shape.live.text = plan.payload.text;
+      }
+      ensureStyleHasFillStyle(shape.style, shape.type);
+      state.shapes.push(shape);
+      confineShapeToStage(shape, stageWidth, stageHeight);
+      ensureBaseKeyframe(shape, now);
+      if (shape.type === "text") {
+        updateTextMetrics(shape, { preserveOrigin: true });
+      }
+      writeKeyframe(shape, now, { markSelected: false });
+      createdShapes.push(shape);
+    } else if (plan.kind === "image") {
+      const created = createImageShapeFromSourceInternal(plan.payload.dataUrl, {
+        select: false,
+        addHistory: false,
+        liveRect: plan.payload.liveRect,
+      });
+      if (created && Number.isFinite(created.id)) {
+        const actual = getShapeById(created.id);
+        if (actual) {
+          confineShapeToStage(actual, stageWidth, stageHeight);
+          writeKeyframe(actual, now, { markSelected: false });
+          createdShapes.push(actual);
+        }
+      }
+    }
+  });
+
+  if (createdShapes.length === 0) {
+    refreshSelectionUI();
+    return false;
+  }
+
+  setSelectedShapes(createdShapes, { primaryId: createdShapes[createdShapes.length - 1].id });
+  return true;
+}
+
+function createExcalidrawElementPlan(element, context) {
+  if (!element) return null;
+  const x = Number.isFinite(element.x) ? element.x : 0;
+  const y = Number.isFinite(element.y) ? element.y : 0;
+  const width = Math.max(0, Number.isFinite(element.width) ? element.width : 0);
+  const height = Math.max(0, Number.isFinite(element.height) ? element.height : 0);
+  const scale = context.scale || 1;
+  const baseX = context.offsetX + (x - context.minX) * scale;
+  const baseY = context.offsetY + (y - context.minY) * scale;
+  const scaledWidth = Math.max(width * scale, 2);
+  const scaledHeight = Math.max(height * scale, 2);
+  const rotationDegrees = radiansToDegrees(Number.isFinite(element.angle) ? element.angle : 0);
+  const opacity = clampToRange((Number.isFinite(element.opacity) ? element.opacity : 100) / 100, 0, 1);
+  const strokeWidth = Math.max((Number.isFinite(element.strokeWidth) ? element.strokeWidth : 1) * scale, 0.5);
+  const strokeStyle = resolveStrokeStyle(element.strokeStyle);
+  const fillColor = resolveExcalidrawColor(element.backgroundColor, state.style.fill);
+  const strokeColor = resolveExcalidrawColor(element.strokeColor, state.style.stroke);
+  const sketchLevel = resolveSketchLevel(element.roughness);
+  const fillStyle = resolveExcalidrawFillStyle(element.fillStyle);
+
+  switch (element.type) {
+    case "rectangle": {
+      return {
+        kind: "shape",
+        payload: {
+          type: "rectangle",
+          style: {
+            fill: fillColor,
+            fillStyle,
+            stroke: strokeColor,
+            strokeWidth,
+            strokeStyle,
+            opacity,
+            rotation: rotationDegrees,
+            edgeStyle: normalizeEdgeStyle(element.roundness ? "round" : "sharp"),
+            sketchLevel,
+          },
+          live: {
+            x: baseX,
+            y: baseY,
+            width: scaledWidth,
+            height: scaledHeight,
+            rotation: rotationDegrees,
+          },
+        },
+      };
+    }
+    case "ellipse": {
+      return {
+        kind: "shape",
+        payload: {
+          type: "circle",
+          style: {
+            fill: fillColor,
+            fillStyle,
+            stroke: strokeColor,
+            strokeWidth,
+            strokeStyle,
+            opacity,
+            rotation: rotationDegrees,
+            sketchLevel,
+          },
+          live: {
+            x: baseX,
+            y: baseY,
+            width: scaledWidth,
+            height: scaledHeight,
+            rotation: rotationDegrees,
+          },
+        },
+      };
+    }
+    case "text": {
+      const fontSize = Math.max(6, (Number.isFinite(element.fontSize) ? element.fontSize : 20) * scale);
+      return {
+        kind: "shape",
+        payload: {
+          type: "text",
+          style: {
+            fill: strokeColor,
+            fillStyle: "solid",
+            stroke: "transparent",
+            strokeWidth: 0,
+            opacity,
+            rotation: rotationDegrees,
+            fontFamily: resolveExcalidrawFontFamily(element.fontFamily),
+            fontSize,
+            sketchLevel,
+          },
+          live: {
+            x: baseX,
+            y: baseY,
+            width: scaledWidth,
+            height: scaledHeight,
+            rotation: rotationDegrees,
+          },
+          text: typeof element.text === "string" ? element.text : "",
+        },
+      };
+    }
+    case "diamond": {
+      return {
+        kind: "shape",
+        payload: {
+          type: "diamond",
+          style: {
+            fill: fillColor,
+            fillStyle,
+            stroke: strokeColor,
+            strokeWidth,
+            strokeStyle,
+            opacity,
+            rotation: rotationDegrees,
+            sketchLevel,
+          },
+          live: {
+            x: baseX,
+            y: baseY,
+            width: scaledWidth,
+            height: scaledHeight,
+            rotation: rotationDegrees,
+          },
+        },
+      };
+    }
+    case "line":
+    case "arrow": {
+      const points = Array.isArray(element.points)
+        ? element.points.filter((pair) => Array.isArray(pair) && pair.length >= 2)
+        : [];
+      if (points.length < 2) {
+        return null;
+      }
+
+      const rotationRadians = degreesToRadians(rotationDegrees);
+      const hasArrowStart = Boolean(element.startArrowhead && element.startArrowhead !== "none");
+      const hasArrowEnd = Boolean(element.endArrowhead && element.endArrowhead !== "none");
+      const targetType = element.type === "arrow" || hasArrowStart || hasArrowEnd ? "arrow" : "line";
+
+      const center = {
+        x: context.offsetX + ((x + width / 2) - context.minX) * scale,
+        y: context.offsetY + ((y + height / 2) - context.minY) * scale,
+      };
+
+      const convertPoint = (pair) => {
+        const rawX = x + (Number(pair[0]) || 0);
+        const rawY = y + (Number(pair[1]) || 0);
+        const stageX = context.offsetX + (rawX - context.minX) * scale;
+        const stageY = context.offsetY + (rawY - context.minY) * scale;
+        if (rotationDegrees === 0) {
+          return { x: stageX, y: stageY };
+        }
+        const offset = {
+          x: stageX - center.x,
+          y: stageY - center.y,
+        };
+        const rotated = rotateVector(offset, rotationRadians);
+        return {
+          x: center.x + rotated.x,
+          y: center.y + rotated.y,
+        };
+      };
+
+      const startPoint = convertPoint(points[0]);
+      const endPoint = convertPoint(points[points.length - 1]);
+
+      if (!Number.isFinite(startPoint.x) || !Number.isFinite(startPoint.y) || !Number.isFinite(endPoint.x) || !Number.isFinite(endPoint.y)) {
+        return null;
+      }
+
+      const connectorStyle = {
+        stroke: strokeColor,
+        fill: "transparent",
+        fillStyle: "solid",
+        strokeWidth,
+        strokeStyle,
+        opacity,
+        sketchLevel,
+        edgeStyle: normalizeEdgeStyle("sharp"),
+        bend: 0,
+      };
+
+      if (targetType === "arrow") {
+        connectorStyle.arrowStart = hasArrowStart;
+        connectorStyle.arrowEnd = hasArrowEnd;
+      }
+
+      return {
+        kind: "shape",
+        payload: {
+          type: targetType,
+          style: connectorStyle,
+          live: {
+            start: startPoint,
+            end: endPoint,
+          },
+        },
+      };
+    }
+    case "freedraw": {
+      const pairs = Array.isArray(element.points)
+        ? element.points.filter((pair) => Array.isArray(pair) && pair.length >= 2)
+        : [];
+      if (pairs.length < 2) {
+        return null;
+      }
+
+      const rotationRadians = degreesToRadians(rotationDegrees);
+      const center = {
+        x: context.offsetX + ((x + width / 2) - context.minX) * scale,
+        y: context.offsetY + ((y + height / 2) - context.minY) * scale,
+      };
+
+      const convertPoint = (pair) => {
+        const rawX = x + (Number(pair[0]) || 0);
+        const rawY = y + (Number(pair[1]) || 0);
+        const stageX = context.offsetX + (rawX - context.minX) * scale;
+        const stageY = context.offsetY + (rawY - context.minY) * scale;
+        if (rotationDegrees === 0) {
+          return { x: stageX, y: stageY };
+        }
+        const offset = {
+          x: stageX - center.x,
+          y: stageY - center.y,
+        };
+        const rotated = rotateVector(offset, rotationRadians);
+        return {
+          x: center.x + rotated.x,
+          y: center.y + rotated.y,
+        };
+      };
+
+      const points = pairs.map(convertPoint).filter((point, index, list) => {
+        if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+          return false;
+        }
+        if (index === 0) return true;
+        const prev = list[index - 1];
+        return !(prev && point.x === prev.x && point.y === prev.y);
+      });
+
+      if (points.length < 2) {
+        return null;
+      }
+
+      return {
+        kind: "shape",
+        payload: {
+          type: "free",
+          style: {
+            stroke: strokeColor,
+            fill: "transparent",
+            fillStyle: "solid",
+            strokeWidth,
+            strokeStyle,
+            opacity,
+            sketchLevel,
+          },
+          live: {
+            points,
+          },
+        },
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+function resolveExcalidrawColor(value, fallback) {
+  if (typeof value === "string" && value.trim() !== "") {
+    return value;
+  }
+  return fallback;
+}
+
+function resolveExcalidrawFillStyle(value) {
+  if (typeof value !== "string") {
+    return DEFAULT_FILL_STYLE;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "hachure" || normalized === "hachured") {
+    return "hachure";
+  }
+  if (normalized === "cross-hatch" || normalized === "crosshatch" || normalized === "cross") {
+    return "cross-hatch";
+  }
+  if (normalized === "solid") {
+    return "solid";
+  }
+  return DEFAULT_FILL_STYLE;
+}
+
+function resolveStrokeStyle(value) {
+  if (value === "dashed") return "dashed";
+  if (value === "dotted") return "dotted";
+  return "solid";
+}
+
+function resolveSketchLevel(value) {
+  if (!Number.isFinite(value)) return 0;
+  return clampToRange(Math.round(value), 0, 2);
+}
+
+function resolveExcalidrawFontFamily(value) {
+  switch (value) {
+    case 1:
+      return DEFAULT_TEXT_FONT;
+    case 2:
+      return "Inter";
+    case 3:
+      return "Cascadia";
+    default:
+      return state.style.fontFamily || DEFAULT_TEXT_FONT;
+  }
+}
+
+function maybePasteGraphicsFromClipboard(clipboardData) {
   if (!clipboardData) return false;
+
+  const acceptImageFile = (file) => {
+    if (!file || typeof file.type !== "string") return false;
+    if (!file.type.startsWith("image/")) return false;
+    if (file.type === "image/svg+xml") {
+      try {
+        const reader = new FileReader();
+        reader.addEventListener("load", () => {
+          const result = reader.result;
+          if (typeof result === "string" && result) {
+            const handled = pasteSvgContent(result);
+            if (!handled) {
+              try {
+                const fallbackBlob = new Blob([result], { type: "image/svg+xml" });
+                pasteImageBlob(fallbackBlob);
+              } catch (error) {
+                // Ignore fallback serialization errors.
+              }
+            }
+          }
+        });
+        reader.readAsText(file);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+    return pasteImageBlob(file);
+  };
 
   const itemList = clipboardData.items ? Array.from(clipboardData.items) : [];
   for (const item of itemList) {
     if (!item) continue;
-    if (item.kind === "file" && typeof item.type === "string" && item.type.startsWith("image/")) {
+    if (item.kind === "file") {
       const file = typeof item.getAsFile === "function" ? item.getAsFile() : null;
-      if (file && pasteImageBlob(file)) {
+      if (acceptImageFile(file)) {
         return true;
       }
     }
@@ -3381,17 +5590,26 @@ function maybePasteImageFromClipboard(clipboardData) {
 
   const fileList = clipboardData.files ? Array.from(clipboardData.files) : [];
   for (const file of fileList) {
-    if (file && typeof file.type === "string" && file.type.startsWith("image/") && pasteImageBlob(file)) {
+    if (acceptImageFile(file)) {
       return true;
     }
   }
 
   if (typeof clipboardData.getData === "function") {
+    const svgContent = clipboardData.getData("image/svg+xml");
+    if (pasteSvgContent(svgContent)) {
+      return true;
+    }
+
     const html = clipboardData.getData("text/html");
     if (html && html.includes("<img")) {
       try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, "text/html");
+        const inlineSvg = doc.querySelector("svg");
+        if (inlineSvg && pasteSvgContent(inlineSvg.outerHTML)) {
+          return true;
+        }
         const img = doc.querySelector("img[src]");
         const src = img?.getAttribute("src");
         if (src && (src.startsWith("data:image") || src.startsWith("http://") || src.startsWith("https://"))) {
@@ -3401,12 +5619,29 @@ function maybePasteImageFromClipboard(clipboardData) {
       } catch (error) {
         // Ignore HTML parsing errors and continue.
       }
+    } else if (html && html.includes("<svg")) {
+      if (pasteSvgContent(html)) {
+        return true;
+      }
     }
 
     const text = clipboardData.getData("text/plain");
-    if (typeof text === "string" && text.trim().startsWith("data:image")) {
-      createImageShapeFromSourceInternal(text.trim());
+    if (tryPasteExcalidrawText(text)) {
       return true;
+    }
+    if (typeof text === "string") {
+      const trimmed = text.trim();
+      if (trimmed.startsWith("data:image")) {
+        createImageShapeFromSourceInternal(trimmed);
+        return true;
+      }
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+        createImageShapeFromSourceInternal(trimmed);
+        return true;
+      }
+      if (trimmed && pasteSvgContent(trimmed)) {
+        return true;
+      }
     }
   }
 
@@ -3414,6 +5649,7 @@ function maybePasteImageFromClipboard(clipboardData) {
 }
 
 function handleGlobalKeyDown(event) {
+  updateModifierStateFromEvent(event);
   if (event.defaultPrevented) return;
 
   const isTextInput = isTextInputActive();
@@ -3450,8 +5686,33 @@ function handleGlobalKeyDown(event) {
     return;
   }
 
+  if (hasCommandModifier && key === "a") {
+    if (isTextInput) {
+      return;
+    }
+    if (selectAllShapes({ focusLast: !event.shiftKey })) {
+      event.preventDefault();
+    }
+    return;
+  }
+
+  if (hasCommandModifier && key === "g") {
+    if (isTextInput) {
+      return;
+    }
+    const didAct = event.shiftKey ? ungroupSelectedShapes() : groupSelectedShapes();
+    if (didAct) {
+      event.preventDefault();
+    }
+    return;
+  }
+
   if (event.key === "Escape") {
     if (closeAllContextMenus()) {
+      event.preventDefault();
+      return;
+    }
+    if (!isTextInput && clearSelection()) {
       event.preventDefault();
       return;
     }
@@ -3478,6 +5739,10 @@ function handleGlobalKeyDown(event) {
   }
 }
 
+function handleGlobalKeyUp(event) {
+  updateModifierStateFromEvent(event);
+}
+
 function handleGlobalCopy(event) {
   if (event.defaultPrevented) return;
   if (isTextInputActive()) return;
@@ -3499,7 +5764,7 @@ function handleGlobalPaste(event) {
   if (event.defaultPrevented) return;
   if (isTextInputActive()) return;
   const clipboardData = event.clipboardData || window.clipboardData || null;
-  if (clipboardData && maybePasteImageFromClipboard(clipboardData)) {
+  if (clipboardData && maybePasteGraphicsFromClipboard(clipboardData)) {
     event.preventDefault();
     return;
   }
@@ -3511,83 +5776,152 @@ function handleGlobalPaste(event) {
 function renderKeyframeList() {
   const container = elements.keyframeList;
   if (!container) return;
+
   container.innerHTML = "";
-  if (!state.selection || state.selectedIds.size !== 1) {
+
+  const shapes = Array.isArray(state.shapes) ? state.shapes : [];
+  if (shapes.length === 0) {
     renderTimelineTrackMarkers();
     syncKeyframeSelectionUI();
     return;
   }
-  state.selection.keyframes
-    .slice()
-    .sort((a, b) => a.time - b.time)
-    .forEach((keyframe) => {
+
+  const selectedTime =
+    typeof state.timeline.selectedKeyframeTime === "number"
+      ? state.timeline.selectedKeyframeTime
+      : null;
+  const selectedShapeId =
+    state.timeline.selectedKeyframeShapeId !== null &&
+    state.timeline.selectedKeyframeShapeId !== undefined
+      ? state.timeline.selectedKeyframeShapeId
+      : null;
+
+  const entries = shapes
+    .map((shape) => {
+      normalizeShapeKeyframes(shape);
+      const keyframes = (Array.isArray(shape.keyframes) ? shape.keyframes : []).filter(
+        (keyframe) => keyframe && typeof keyframe.time === "number",
+      );
+      if (keyframes.length === 0) {
+        return null;
+      }
+      return {
+        shape,
+        keyframes: keyframes.slice().sort((a, b) => a.time - b.time),
+      };
+    })
+    .filter(Boolean);
+
+  if (entries.length === 0) {
+    renderTimelineTrackMarkers();
+    syncKeyframeSelectionUI();
+    return;
+  }
+
+  entries.forEach(({ shape, keyframes }) => {
+    keyframes.forEach((keyframe) => {
       const safeTime = clampTimelineTime(keyframe.time, 0);
-  keyframe.time = safeTime;
+      keyframe.time = safeTime;
+
       const chip = document.createElement("div");
       chip.className = "keyframe-chip";
       chip.setAttribute("role", "button");
       chip.setAttribute("tabindex", "0");
       chip.setAttribute("data-keyframe-time", safeTime.toString());
-      chip.setAttribute("aria-selected", "false");
+      chip.setAttribute("data-shape-id", String(shape.id));
+
+      const isSelected =
+        selectedTime !== null &&
+        Math.abs(selectedTime - safeTime) < 1e-4 &&
+        selectedShapeId === shape.id;
+      chip.setAttribute("aria-selected", isSelected ? "true" : "false");
+      chip.classList.toggle("selected", isSelected);
+      chip.setAttribute(
+        "title",
+        `${capitalize(shape.type)} #${shape.id} at ${safeTime.toFixed(1)} seconds`,
+      );
+
       const label = document.createElement("span");
-      label.textContent = `${safeTime.toFixed(1)}s`;
+      label.textContent = `#${shape.id} • ${safeTime.toFixed(1)}s`;
+
       const remove = document.createElement("button");
       remove.type = "button";
-      remove.setAttribute("aria-label", `Delete keyframe at ${safeTime.toFixed(1)} seconds`);
-  remove.setAttribute("title", "Remove this keyframe");
+      remove.setAttribute(
+        "aria-label",
+        `Delete keyframe at ${safeTime.toFixed(1)} seconds for shape #${shape.id}`,
+      );
+      remove.setAttribute("title", "Remove this keyframe");
       remove.textContent = "×";
       remove.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        setSelectedKeyframeTime(safeTime);
-        deleteKeyframe(state.selection, safeTime);
+        setSelectedKeyframeTime(safeTime, { shapeId: shape.id, selectShape: true });
+        deleteKeyframe(shape, safeTime);
       });
+
       chip.addEventListener("click", () => {
-        setSelectedKeyframeTime(safeTime);
+        setSelectedKeyframeTime(safeTime, { shapeId: shape.id, selectShape: true });
         setTimelineTime(safeTime, { apply: true });
       });
+
       chip.addEventListener("focus", () => {
-        setSelectedKeyframeTime(safeTime);
+        setSelectedKeyframeTime(safeTime, { shapeId: shape.id, selectShape: true });
       });
+
       chip.addEventListener("keydown", (event) => {
         if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
           event.preventDefault();
-          if (!state.selection || state.selectedIds.size !== 1) return;
           const step = event.shiftKey ? 1 : 0.1;
           const direction = event.key === "ArrowLeft" ? -1 : 1;
           const candidate = safeTime + direction * step;
           const nextTime = clampTimelineTime(Number(candidate.toFixed(3)), safeTime);
-          if (moveKeyframe(state.selection, safeTime, nextTime)) {
-            setSelectedKeyframeTime(nextTime, { focus: true });
+          if (moveKeyframe(shape, safeTime, nextTime)) {
+            setSelectedKeyframeTime(nextTime, {
+              focus: true,
+              shapeId: shape.id,
+              selectShape: true,
+            });
             setTimelineTime(nextTime, { apply: true });
           }
         } else if (event.key === "Home") {
           event.preventDefault();
-          if (!state.selection || state.selectedIds.size !== 1) return;
-          if (moveKeyframe(state.selection, safeTime, 0)) {
-            setSelectedKeyframeTime(0, { focus: true });
+          if (moveKeyframe(shape, safeTime, 0)) {
+            setSelectedKeyframeTime(0, {
+              focus: true,
+              shapeId: shape.id,
+              selectShape: true,
+            });
             setTimelineTime(0, { apply: true });
           }
         } else if (event.key === "End") {
           event.preventDefault();
-          if (!state.selection || state.selectedIds.size !== 1) return;
-          const duration = Number.isFinite(state.timeline.duration) && state.timeline.duration > 0 ? state.timeline.duration : safeTime;
-          if (moveKeyframe(state.selection, safeTime, duration)) {
-            setSelectedKeyframeTime(duration, { focus: true });
+          const duration =
+            Number.isFinite(state.timeline.duration) && state.timeline.duration > 0
+              ? state.timeline.duration
+              : safeTime;
+          if (moveKeyframe(shape, safeTime, duration)) {
+            setSelectedKeyframeTime(duration, {
+              focus: true,
+              shapeId: shape.id,
+              selectShape: true,
+            });
             setTimelineTime(duration, { apply: true });
           }
         } else if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          setSelectedKeyframeTime(safeTime);
+          setSelectedKeyframeTime(safeTime, { shapeId: shape.id, selectShape: true });
           setTimelineTime(safeTime, { apply: true });
         } else if (event.key === "Delete" || event.key === "Backspace") {
           event.preventDefault();
-          setSelectedKeyframeTime(safeTime);
-          deleteKeyframe(state.selection, safeTime);
+          setSelectedKeyframeTime(safeTime, { shapeId: shape.id, selectShape: true });
+          deleteKeyframe(shape, safeTime);
         }
       });
+
       chip.append(label, remove);
       container.appendChild(chip);
     });
+  });
+
   syncKeyframeSelectionUI();
   renderTimelineTrackMarkers();
 }
@@ -3595,6 +5929,7 @@ function renderKeyframeList() {
 function deleteKeyframe(shape, time) {
   if (!shape) return;
   const removedSelected =
+    state.timeline.selectedKeyframeShapeId === shape.id &&
     typeof state.timeline.selectedKeyframeTime === "number" &&
     Math.abs(state.timeline.selectedKeyframeTime - time) < KEYFRAME_EPSILON;
 
@@ -3603,8 +5938,17 @@ function deleteKeyframe(shape, time) {
 
   if (removedSelected) {
     const sorted = shape.keyframes;
-    const fallback = sorted.find((keyframe) => keyframe.time >= time - KEYFRAME_EPSILON) || sorted[sorted.length - 1] || null;
-    state.timeline.selectedKeyframeTime = fallback ? fallback.time : null;
+    const fallback =
+      sorted.find((keyframe) => keyframe.time >= time - KEYFRAME_EPSILON) ||
+      sorted[sorted.length - 1] ||
+      null;
+    if (fallback) {
+      state.timeline.selectedKeyframeTime = fallback.time;
+      state.timeline.selectedKeyframeShapeId = shape.id;
+    } else {
+      state.timeline.selectedKeyframeTime = null;
+      state.timeline.selectedKeyframeShapeId = null;
+    }
   }
 
   applyTimelineState();
@@ -3624,8 +5968,12 @@ function moveKeyframe(shape, fromTime, toTime, { apply = true, render = true } =
   source.time = target;
   normalizeShapeKeyframes(shape);
 
-  if (state.selection && state.selectedIds.size === 1 && state.selection.id === shape.id) {
+  if (
+    (state.selection && state.selectedIds.size === 1 && state.selection.id === shape.id) ||
+    state.timeline.selectedKeyframeShapeId === shape.id
+  ) {
     state.timeline.selectedKeyframeTime = target;
+    state.timeline.selectedKeyframeShapeId = shape.id;
   }
 
   if (apply) {
@@ -3637,17 +5985,49 @@ function moveKeyframe(shape, fromTime, toTime, { apply = true, render = true } =
   return true;
 }
 
-function setSelectedKeyframeTime(time, { focus = false } = {}) {
-  if (!state.selection || state.selectedIds.size !== 1) {
+function setSelectedKeyframeTime(time, { focus = false, shapeId = null, selectShape = false } = {}) {
+  const desiredTime = clampTimelineTime(time, 0);
+  const numericShapeId = Number(shapeId);
+  let targetShape = Number.isFinite(numericShapeId) ? getShapeById(numericShapeId) : null;
+
+  if (!targetShape && state.selection && state.selectedIds.size === 1) {
+    targetShape = state.selection;
+  } else if (!targetShape && Number.isFinite(state.timeline.selectedKeyframeShapeId)) {
+    targetShape = getShapeById(state.timeline.selectedKeyframeShapeId);
+  }
+
+  if (selectShape && targetShape) {
+    if (!state.selectedIds.has(targetShape.id) || state.selectedIds.size !== 1) {
+      updateSelection(targetShape);
+    }
+    if (state.selection && state.selection.id === targetShape.id) {
+      targetShape = state.selection;
+    } else if (Number.isFinite(targetShape.id)) {
+      targetShape = getShapeById(targetShape.id);
+    }
+  }
+
+  if (!targetShape) {
     state.timeline.selectedKeyframeTime = null;
-    syncKeyframeSelectionUI();
+    state.timeline.selectedKeyframeShapeId = null;
+    syncKeyframeSelectionUI({ focus: false });
     renderTimelineTrackMarkers();
     return;
   }
 
-  const desiredTime = clampTimelineTime(time, 0);
-  const target = state.selection.keyframes.find((keyframe) => Math.abs(keyframe.time - desiredTime) < KEYFRAME_EPSILON);
-  state.timeline.selectedKeyframeTime = target ? target.time : null;
+  normalizeShapeKeyframes(targetShape);
+  const targetKeyframe = targetShape.keyframes.find(
+    (keyframe) => Math.abs(keyframe.time - desiredTime) < KEYFRAME_EPSILON,
+  );
+
+  if (targetKeyframe) {
+    state.timeline.selectedKeyframeTime = targetKeyframe.time;
+    state.timeline.selectedKeyframeShapeId = targetShape.id;
+  } else {
+    state.timeline.selectedKeyframeTime = null;
+    state.timeline.selectedKeyframeShapeId = null;
+  }
+
   syncKeyframeSelectionUI({ focus });
   renderTimelineTrackMarkers();
 }
@@ -3655,12 +6035,18 @@ function setSelectedKeyframeTime(time, { focus = false } = {}) {
 function syncKeyframeSelectionUI({ focus = false } = {}) {
   if (!elements.keyframeList) return;
   const selectedTime = state.timeline.selectedKeyframeTime;
+  const selectedShapeId = state.timeline.selectedKeyframeShapeId;
   const chips = elements.keyframeList.querySelectorAll(".keyframe-chip");
   let focusTarget = null;
 
   chips.forEach((chip) => {
     const chipTime = Number(chip.getAttribute("data-keyframe-time"));
-    const isSelected = typeof selectedTime === "number" && Math.abs(chipTime - selectedTime) < KEYFRAME_EPSILON;
+    const chipShapeId = Number(chip.getAttribute("data-shape-id"));
+    const isSelected =
+      Number.isFinite(selectedShapeId) &&
+      chipShapeId === selectedShapeId &&
+      typeof selectedTime === "number" &&
+      Math.abs(chipTime - selectedTime) < KEYFRAME_EPSILON;
     chip.classList.toggle("selected", isSelected);
     chip.setAttribute("aria-selected", String(isSelected));
     if (isSelected) {
@@ -3682,6 +6068,9 @@ function renderTimelineTrackMarkers() {
 
   const duration = Number.isFinite(state.timeline.duration) && state.timeline.duration > 0 ? state.timeline.duration : 1;
   const selectedTime = typeof state.timeline.selectedKeyframeTime === "number" ? state.timeline.selectedKeyframeTime : null;
+  const selectedShapeId = Number.isFinite(state.timeline.selectedKeyframeShapeId)
+    ? state.timeline.selectedKeyframeShapeId
+    : null;
 
   state.shapes.forEach((shape) => {
     if (!shape || !Array.isArray(shape.keyframes)) return;
@@ -3701,34 +6090,78 @@ function renderTimelineTrackMarkers() {
       const title = state.shapes.length > 1 ? `${titleBase} for shape #${shape.id}` : titleBase;
       marker.title = title;
       marker.setAttribute("aria-label", title);
-      if (state.selectedIds.has(shape.id) && selectedTime !== null && Math.abs(selectedTime - safeTime) < KEYFRAME_EPSILON) {
+      const isSelectedMarker =
+        selectedShapeId === shape.id &&
+        selectedTime !== null &&
+        Math.abs(selectedTime - safeTime) < KEYFRAME_EPSILON;
+      if (isSelectedMarker) {
         marker.classList.add("selected");
       }
+      marker.setAttribute("aria-selected", String(isSelectedMarker));
       marker.addEventListener("click", (event) => {
         event.stopPropagation();
-        if (!state.selectedIds.has(shape.id) || state.selectedIds.size !== 1) {
-          updateSelection(shape);
-        }
-        setSelectedKeyframeTime(safeTime);
+        setSelectedKeyframeTime(safeTime, { shapeId: shape.id, selectShape: true });
         setTimelineTime(safeTime, { apply: true });
       });
       marker.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          if (!state.selectedIds.has(shape.id) || state.selectedIds.size !== 1) {
-            updateSelection(shape);
-          }
-          setSelectedKeyframeTime(safeTime, { focus: false });
+          setSelectedKeyframeTime(safeTime, { focus: false, shapeId: shape.id, selectShape: true });
           setTimelineTime(safeTime, { apply: true });
         } else if (event.key === "Delete" || event.key === "Backspace") {
           event.preventDefault();
-          if (!state.selectedIds.has(shape.id) || state.selectedIds.size !== 1) {
-            updateSelection(shape);
-          }
-          setSelectedKeyframeTime(safeTime);
+          setSelectedKeyframeTime(safeTime, { shapeId: shape.id, selectShape: true });
           deleteKeyframe(shape, safeTime);
         }
       });
+      
+      // Make keyframe markers draggable
+      marker.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return; // Only left click
+        event.stopPropagation();
+        event.preventDefault();
+        
+        const trackRect = elements.timelineTrack.getBoundingClientRect();
+        const startX = event.clientX;
+        const startTime = safeTime;
+        
+        marker.classList.add("dragging");
+        marker.setPointerCapture(event.pointerId);
+        
+        const handlePointerMove = (moveEvent) => {
+          const deltaX = moveEvent.clientX - startX;
+          const trackWidth = trackRect.width;
+          const deltaTime = (deltaX / trackWidth) * duration;
+          const newTime = Math.max(0, Math.min(duration, startTime + deltaTime));
+          
+          // Update marker position visually
+          const ratio = newTime / duration;
+          marker.style.left = `${ratio * 100}%`;
+          marker.setAttribute("data-time", newTime.toString());
+        };
+        
+        const handlePointerUp = (upEvent) => {
+          marker.classList.remove("dragging");
+          marker.releasePointerCapture(upEvent.pointerId);
+          
+          const deltaX = upEvent.clientX - startX;
+          const trackWidth = trackRect.width;
+          const deltaTime = (deltaX / trackWidth) * duration;
+          const newTime = Math.max(0, Math.min(duration, startTime + deltaTime));
+          
+          // Update the actual keyframe time in the shape data
+          moveKeyframe(shape, startTime, newTime);
+          
+          marker.removeEventListener("pointermove", handlePointerMove);
+          marker.removeEventListener("pointerup", handlePointerUp);
+          marker.removeEventListener("pointercancel", handlePointerUp);
+        };
+        
+        marker.addEventListener("pointermove", handlePointerMove);
+        marker.addEventListener("pointerup", handlePointerUp);
+        marker.addEventListener("pointercancel", handlePointerUp);
+      });
+      
       elements.timelineTrack.appendChild(marker);
     });
   });
@@ -3846,11 +6279,16 @@ function snapshotShape(shape) {
     style: { ...shape.style },
   };
 
+  ensureStyleHasFillStyle(data.style, shape.type);
+
   if (shape.type === "line" || shape.type === "arrow") {
     data.live = {
       start: { ...shape.live.start },
       end: { ...shape.live.end },
     };
+    if (shape.type === "line" && shape.live.control) {
+      data.live.control = { ...shape.live.control };
+    }
   } else if (shape.type === "free") {
     data.live = {
       points: shape.live.points.map((point) => ({ ...point })),
@@ -3869,9 +6307,17 @@ function cloneSnapshot(live) {
 
 function applySnapshot(shape, snapshot) {
   shape.style = { ...snapshot.style };
+  ensureStyleHasFillStyle(shape.style, shape.type);
   if (shape.type === "line" || shape.type === "arrow") {
     shape.live.start = { ...snapshot.live.start };
     shape.live.end = { ...snapshot.live.end };
+    if (shape.type === "line") {
+      if (snapshot.live.control) {
+        shape.live.control = { ...snapshot.live.control };
+      } else {
+        delete shape.live.control;
+      }
+    }
   } else if (shape.type === "free") {
     shape.live.points = snapshot.live.points.map((point) => ({ ...point }));
   } else {
@@ -3925,32 +6371,58 @@ function interpolateKeyframes(keyframes, time) {
 function blendSnapshots(a, b, t) {
   const interpolate = (from, to) => from + (to - from) * t;
   const choose = (from, to) => (t < 0.5 ? from : to);
+  const resolveOpacity = (style) => {
+    if (style && typeof style.opacity === "number") {
+      return clampUnit(style.opacity);
+    }
+    if (typeof state.style.opacity === "number") {
+      return clampUnit(state.style.opacity);
+    }
+    return 1;
+  };
   const result = {
     type: a.type,
     style: {
       fill: choose(a.style.fill, b.style.fill),
+      fillStyle: choose(normalizeFillStyle(a.style.fillStyle), normalizeFillStyle(b.style.fillStyle)),
       stroke: choose(a.style.stroke, b.style.stroke),
       strokeWidth: interpolate(a.style.strokeWidth, b.style.strokeWidth),
+      opacity: clampUnit(interpolate(resolveOpacity(a.style), resolveOpacity(b.style))),
+      strokeStyle: choose(
+        normalizeStrokeStyle(a.style.strokeStyle ?? state.style.strokeStyle ?? DEFAULT_STROKE_STYLE),
+        normalizeStrokeStyle(b.style.strokeStyle ?? state.style.strokeStyle ?? DEFAULT_STROKE_STYLE),
+      ),
       sketchLevel: Math.round(choose(a.style.sketchLevel ?? 0, b.style.sketchLevel ?? 0)),
       arrowStart: choose(Boolean(a.style.arrowStart), Boolean(b.style.arrowStart)),
       arrowEnd: choose(Boolean(a.style.arrowEnd ?? true), Boolean(b.style.arrowEnd ?? true)),
-      fontFamily: choose(a.style.fontFamily ?? state.style.fontFamily ?? "Inter", b.style.fontFamily ?? state.style.fontFamily ?? "Inter"),
+      fontFamily: choose(
+        a.style.fontFamily ?? state.style.fontFamily ?? DEFAULT_TEXT_FONT,
+        b.style.fontFamily ?? state.style.fontFamily ?? DEFAULT_TEXT_FONT,
+      ),
       fontSize: interpolate(Number(a.style.fontSize ?? state.style.fontSize ?? 32), Number(b.style.fontSize ?? state.style.fontSize ?? 32)),
       rotation: interpolate(a.style.rotation ?? 0, b.style.rotation ?? 0),
     },
   };
 
   if (a.type === "line" || a.type === "arrow") {
-    result.live = {
-      start: {
-        x: interpolate(a.live.start.x, b.live.start.x),
-        y: interpolate(a.live.start.y, b.live.start.y),
-      },
-      end: {
-        x: interpolate(a.live.end.x, b.live.end.x),
-        y: interpolate(a.live.end.y, b.live.end.y),
-      },
+    const start = {
+      x: interpolate(a.live.start.x, b.live.start.x),
+      y: interpolate(a.live.start.y, b.live.start.y),
     };
+    const end = {
+      x: interpolate(a.live.end.x, b.live.end.x),
+      y: interpolate(a.live.end.y, b.live.end.y),
+    };
+    result.live = { start, end };
+    if (a.type === "line") {
+      const offsetA = getLineBendOffset(a.live.start, a.live.end, a.live.control);
+      const offsetB = getLineBendOffset(b.live.start, b.live.end, b.live.control);
+      const blendedOffset = interpolate(offsetA, offsetB);
+      const clamped = clampLineBendOffset(start, end, blendedOffset);
+      if (Math.abs(clamped) >= 1.2) {
+        result.live.control = getLineControlFromOffset(start, end, clamped);
+      }
+    }
   } else if (a.type === "free") {
     const length = Math.min(a.live.points.length, b.live.points.length);
     result.live = {
@@ -4078,16 +6550,96 @@ function applyTimelineDuration(value) {
   renderTimelineTrackMarkers();
 }
 
+function setControlGroupState(container, buttons, { disabled = false, hidden = false } = {}) {
+  if (container) {
+    container.classList.toggle("is-disabled", disabled && !hidden);
+    container.classList.toggle("is-hidden", hidden);
+    if (hidden) {
+      container.setAttribute("aria-hidden", "true");
+      container.setAttribute("hidden", "");
+      container.removeAttribute("aria-disabled");
+    } else {
+      container.removeAttribute("hidden");
+      container.removeAttribute("aria-hidden");
+      if (disabled) {
+        container.setAttribute("aria-disabled", "true");
+      } else {
+        container.removeAttribute("aria-disabled");
+      }
+    }
+  }
+  if (!Array.isArray(buttons)) {
+    return;
+  }
+  buttons.forEach((button) => {
+    if (!button) return;
+    button.disabled = disabled || hidden;
+    button.classList.toggle("disabled", (disabled || hidden) && !hidden);
+    if (hidden) {
+      button.setAttribute("tabindex", "-1");
+    } else {
+      button.removeAttribute("tabindex");
+    }
+    if (disabled && !hidden) {
+      button.setAttribute("aria-disabled", "true");
+    } else {
+      button.removeAttribute("aria-disabled");
+    }
+  });
+}
+
 function syncSelectionInputs() {
   const useSelectionStyle = state.selection && state.selectedIds.size === 1;
   const styleSource = useSelectionStyle ? state.selection.style : state.style;
+  const selectionType = useSelectionStyle ? state.selection.type : null;
+  const selectionIsConnector = selectionType === "line" || selectionType === "arrow";
+  const toolIsConnector = !useSelectionStyle && (state.tool === "line" || state.tool === "arrow");
+  const activeToolType = state.tool;
+  const activeType = selectionType || (activeToolType !== "select" ? activeToolType : null);
+  const supportsSketchControl = !activeType || (!selectionIsConnector && !toolIsConnector);
+  const supportsFillStyle = !activeType || ["rectangle", "square", "diamond", "circle"].includes(activeType);
+  const supportsEdgeStyleTool = !activeType || ["rectangle", "square", "diamond"].includes(activeType);
+  const selectionSupportsEdge = useSelectionStyle ? shapeSupportsEdgeStyle(state.selection) : true;
+  const showEdgeStyle = supportsEdgeStyleTool && selectionSupportsEdge;
+
+  setControlGroupState(elements.sketchControl, elements.sketchButtons, {
+    hidden: !supportsSketchControl,
+    disabled: !supportsSketchControl,
+  });
+  setControlGroupState(elements.fillStyleControl, elements.fillStyleButtons, {
+    hidden: !supportsFillStyle,
+    disabled: !supportsFillStyle,
+  });
+  setControlGroupState(elements.edgeStyleControl, elements.edgeStyleButtons, {
+    hidden: !showEdgeStyle,
+    disabled: !showEdgeStyle,
+  });
+
   if (elements.fillColor && typeof styleSource.fill === "string") {
     elements.fillColor.value = styleSource.fill;
   }
   if (elements.strokeColor && typeof styleSource.stroke === "string") {
     elements.strokeColor.value = styleSource.stroke;
   }
+  updateFillStyleButtonStates(styleSource.fillStyle ?? state.style.fillStyle ?? DEFAULT_FILL_STYLE);
+  updateEdgeStyleButtonStates(styleSource.edgeStyle ?? state.style.edgeStyle ?? DEFAULT_EDGE_STYLE);
+  updateStrokeStyleButtonStates(styleSource.strokeStyle ?? state.style.strokeStyle ?? DEFAULT_STROKE_STYLE);
   updateSketchButtonStates(Number(styleSource.sketchLevel ?? 0));
+
+  const showFontControls = selectionType === "text" || (!useSelectionStyle && state.tool === "text");
+  if (elements.fontFamilyControl) {
+    elements.fontFamilyControl.classList.toggle("is-hidden", !showFontControls);
+    if (!showFontControls) {
+      elements.fontFamilyControl.setAttribute("hidden", "");
+      elements.fontFamilyControl.setAttribute("aria-hidden", "true");
+    } else {
+      elements.fontFamilyControl.removeAttribute("hidden");
+      elements.fontFamilyControl.removeAttribute("aria-hidden");
+    }
+  }
+  if (elements.fontFamily) {
+    elements.fontFamily.disabled = !showFontControls;
+  }
 
   const strokeWidth = Number(styleSource.strokeWidth) || 0;
   const sliderMin = Number(elements.strokeWidth?.min) || 1;
@@ -4101,11 +6653,21 @@ function syncSelectionInputs() {
     elements.strokeWidthValue.textContent = displayValue;
   }
 
+  const opacityValue = typeof styleSource.opacity === "number" ? styleSource.opacity : state.style.opacity ?? 1;
+  const clampedOpacity = Math.max(0, Math.min(1, opacityValue));
+  const opacityPercent = Math.round(clampedOpacity * 100);
+  if (elements.opacity) {
+    elements.opacity.value = String(opacityPercent);
+  }
+  if (elements.opacityValue) {
+    elements.opacityValue.textContent = `${opacityPercent}%`;
+  }
+
   if (elements.fontFamily) {
-    const fontValue = styleSource.fontFamily || state.style.fontFamily || "Inter";
+    const fontValue = styleSource.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT;
     const options = Array.from(elements.fontFamily.options || []);
     const hasOption = options.some((option) => option.value === fontValue);
-    elements.fontFamily.value = hasOption ? fontValue : "Inter";
+    elements.fontFamily.value = hasOption ? fontValue : DEFAULT_TEXT_FONT;
   }
 }
 
@@ -4115,7 +6677,48 @@ function updateSketchButtonStates(level) {
   }
   elements.sketchButtons.forEach((button) => {
     const buttonLevel = Number(button.getAttribute("data-sketch-level")) || 0;
-    button.setAttribute("aria-pressed", buttonLevel === level ? "true" : "false");
+    const isActive = buttonLevel === level;
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    button.classList.toggle("selected", isActive);
+  });
+}
+
+function updateFillStyleButtonStates(value) {
+  if (!Array.isArray(elements.fillStyleButtons) || elements.fillStyleButtons.length === 0) {
+    return;
+  }
+  const active = normalizeFillStyle(value ?? state.style.fillStyle ?? DEFAULT_FILL_STYLE);
+  elements.fillStyleButtons.forEach((button) => {
+    const buttonValue = normalizeFillStyle(button.getAttribute("data-fill-style") || DEFAULT_FILL_STYLE);
+    const isActive = buttonValue === active;
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    button.classList.toggle("selected", isActive);
+  });
+}
+
+function updateEdgeStyleButtonStates(value) {
+  if (!Array.isArray(elements.edgeStyleButtons) || elements.edgeStyleButtons.length === 0) {
+    return;
+  }
+  const active = normalizeEdgeStyle(value ?? state.style.edgeStyle ?? DEFAULT_EDGE_STYLE);
+  elements.edgeStyleButtons.forEach((button) => {
+    const buttonValue = normalizeEdgeStyle(button.getAttribute("data-edge-style") || DEFAULT_EDGE_STYLE);
+    const isActive = buttonValue === active;
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    button.classList.toggle("selected", isActive);
+  });
+}
+
+function updateStrokeStyleButtonStates(value) {
+  if (!Array.isArray(elements.strokeStyleButtons) || elements.strokeStyleButtons.length === 0) {
+    return;
+  }
+  const active = normalizeStrokeStyle(value ?? state.style.strokeStyle ?? DEFAULT_STROKE_STYLE);
+  elements.strokeStyleButtons.forEach((button) => {
+    const buttonValue = normalizeStrokeStyle(button.getAttribute("data-stroke-style") || DEFAULT_STROKE_STYLE);
+    const isActive = buttonValue === active;
+    button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    button.classList.toggle("selected", isActive);
   });
 }
 
@@ -4123,8 +6726,58 @@ function applySketchLevel(level) {
   const clamped = Number.isFinite(level) ? Math.max(0, Math.min(5, Math.round(level))) : 0;
   state.style.sketchLevel = clamped;
   updateSketchButtonStates(clamped);
-  if (state.selection) {
+  if (state.selection && state.selection.type !== "line" && state.selection.type !== "arrow") {
     state.selection.style.sketchLevel = clamped;
+    commitShapeChange(state.selection);
+  }
+}
+
+function applyFillStyle(value) {
+  const normalized = normalizeFillStyle(value, state.style.fillStyle ?? DEFAULT_FILL_STYLE);
+  state.style.fillStyle = normalized;
+  updateFillStyleButtonStates(normalized);
+  const canApply =
+    state.selection &&
+    state.selectedIds.size === 1 &&
+    state.selection.type !== "line" &&
+    state.selection.type !== "arrow";
+  if (canApply) {
+    ensureStyleHasFillStyle(state.selection.style, state.selection.type);
+    state.selection.style.fillStyle = normalized;
+    commitShapeChange(state.selection);
+  }
+}
+
+function shapeSupportsEdgeStyle(shape) {
+  if (!shape) {
+    return false;
+  }
+  return (
+    shape.type === "rectangle" ||
+    shape.type === "square" ||
+    shape.type === "triangle" ||
+    shape.type === "diamond"
+  );
+}
+
+function applyEdgeStyle(value) {
+  const normalized = normalizeEdgeStyle(value, state.style.edgeStyle ?? DEFAULT_EDGE_STYLE);
+  state.style.edgeStyle = normalized;
+  updateEdgeStyleButtonStates(normalized);
+  if (state.selection && state.selectedIds.size === 1 && shapeSupportsEdgeStyle(state.selection)) {
+    ensureStyleHasFillStyle(state.selection.style, state.selection.type);
+    state.selection.style.edgeStyle = normalized;
+    commitShapeChange(state.selection);
+  }
+}
+
+function applyStrokeStyle(value) {
+  const normalized = normalizeStrokeStyle(value, state.style.strokeStyle ?? DEFAULT_STROKE_STYLE);
+  state.style.strokeStyle = normalized;
+  updateStrokeStyleButtonStates(normalized);
+  if (state.selection && state.selectedIds.size === 1) {
+    ensureStyleHasFillStyle(state.selection.style, state.selection.type);
+    state.selection.style.strokeStyle = normalized;
     commitShapeChange(state.selection);
   }
 }
@@ -4566,13 +7219,16 @@ function createSeededRandom(value) {
 
 function drawSketchStroke(context, buildPath, shape, level) {
   const passes = level === 1 ? 2 : 3;
-  const jitter = level === 1 ? 1.5 : 3;
+  let jitter = level === 1 ? 0.8 : 1.6;
+  if (shape?.type === "line" || shape?.type === "arrow") {
+    jitter = level === 1 ? 0.35 : 0.75;
+  }
   const random = createSeededRandom(`${shape.id}:${level}`);
   for (let i = 0; i < passes; i += 1) {
     context.save();
     const offsetX = (random() - 0.5) * jitter;
     const offsetY = (random() - 0.5) * jitter;
-    const angle = (random() - 0.5) * jitter * 0.05;
+    const angle = (random() - 0.5) * jitter * 0.03;
     context.translate(offsetX, offsetY);
     context.rotate(angle);
     buildPath();
@@ -4605,15 +7261,125 @@ function distanceSquared(a, b) {
   return dx * dx + dy * dy;
 }
 
+function getQuadraticPoint(start, control, end, t) {
+  const oneMinusT = 1 - t;
+  const x = oneMinusT * oneMinusT * start.x + 2 * oneMinusT * t * control.x + t * t * end.x;
+  const y = oneMinusT * oneMinusT * start.y + 2 * oneMinusT * t * control.y + t * t * end.y;
+  return { x, y };
+}
+
+function distanceToQuadratic(point, start, control, end) {
+  const segments = 16;
+  let closest = Infinity;
+  let previous = start;
+  for (let index = 1; index <= segments; index += 1) {
+    const t = index / segments;
+    const current = getQuadraticPoint(start, control, end, t);
+    const candidate = distanceToSegment(point, previous, current);
+    if (candidate < closest) {
+      closest = candidate;
+    }
+    previous = current;
+  }
+  return closest;
+}
+
+function getLineMidpoint(start, end) {
+  return {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+}
+
+function getLineNormal(start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 1e-6) {
+    return { x: 0, y: -1 };
+  }
+  return {
+    x: -dy / length,
+    y: dx / length,
+  };
+}
+
+function getLineBendOffset(start, end, control) {
+  if (!start || !end || !control) return 0;
+  const normal = getLineNormal(start, end);
+  const mid = getLineMidpoint(start, end);
+  const vector = { x: control.x - mid.x, y: control.y - mid.y };
+  return vector.x * normal.x + vector.y * normal.y;
+}
+
+function clampLineBendOffset(start, end, offset) {
+  const length = Math.max(1, distance(start, end));
+  const limit = Math.max(24, length * 0.65);
+  return Math.max(-limit, Math.min(limit, offset));
+}
+
+function getLineControlFromOffset(start, end, offset) {
+  const normal = getLineNormal(start, end);
+  const mid = getLineMidpoint(start, end);
+  return {
+    x: mid.x + normal.x * offset,
+    y: mid.y + normal.y * offset,
+  };
+}
+
+function getLineBendOffsetFromPoint(start, end, point) {
+  const normal = getLineNormal(start, end);
+  const mid = getLineMidpoint(start, end);
+  const vector = { x: point.x - mid.x, y: point.y - mid.y };
+  return vector.x * normal.x + vector.y * normal.y;
+}
+
+function getLineBendHandlePosition(shape) {
+  if (!shape || shape.type !== "line") return null;
+  const { start, end, control } = shape.live || {};
+  if (!start || !end) return null;
+  if (control && Number.isFinite(control.x) && Number.isFinite(control.y)) {
+    return { x: control.x, y: control.y };
+  }
+  return getLineMidpoint(start, end);
+}
+
+function computeQuadraticExtremumCoordinate(p0, p1, p2) {
+  const denominator = p0 - 2 * p1 + p2;
+  if (Math.abs(denominator) < 1e-6) return null;
+  const t = (p0 - p1) / denominator;
+  if (t <= 0 || t >= 1) return null;
+  return t;
+}
+
 function getShapeBounds(shape) {
   if (shape.type === "free") {
     return getBoundsFromPoints(shape.live.points);
   }
   if (shape.type === "line" || shape.type === "arrow") {
-    const minX = Math.min(shape.live.start.x, shape.live.end.x);
-    const maxX = Math.max(shape.live.start.x, shape.live.end.x);
-    const minY = Math.min(shape.live.start.y, shape.live.end.y);
-    const maxY = Math.max(shape.live.start.y, shape.live.end.y);
+    const { start, end } = shape.live;
+    if (!start || !end) {
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+    const points = [start, end];
+    if (shape.type === "line" && shape.live.control) {
+      const control = shape.live.control;
+      points.push(control);
+      const tx = computeQuadraticExtremumCoordinate(start.x, control.x, end.x);
+      if (tx !== null) {
+        points.push(getQuadraticPoint(start, control, end, tx));
+      }
+      const ty = computeQuadraticExtremumCoordinate(start.y, control.y, end.y);
+      if (ty !== null) {
+        points.push(getQuadraticPoint(start, control, end, ty));
+      }
+    }
+    const xs = points.map((pt) => pt.x);
+    const ys = points.map((pt) => pt.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
   }
   return { x: shape.live.x, y: shape.live.y, width: shape.live.width, height: shape.live.height };
@@ -4668,6 +7434,7 @@ function rectContainsRect(outer, inner, epsilon = 0) {
 function getShapeCenter(shape) {
   switch (shape.type) {
     case "rectangle":
+    case "diamond":
     case "square":
     case "circle":
     case "image":
@@ -4700,7 +7467,7 @@ function getCenterFromBounds(bounds) {
 
 function getShapeRotation(shape) {
   if (!shape) return 0;
-  if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "text") {
+  if (shape.type === "rectangle" || shape.type === "diamond" || shape.type === "square" || shape.type === "circle" || shape.type === "text") {
     if (typeof shape.live.rotation === "number") {
       return shape.live.rotation;
     }
@@ -4895,6 +7662,15 @@ function cloneShape(shape) {
       source: shape.asset.source,
     };
   }
+  ensureStyleHasFillStyle(clone.style, clone.type);
+  if (Array.isArray(clone.keyframes)) {
+    clone.keyframes.forEach((keyframe) => {
+      if (keyframe && keyframe.snapshot && keyframe.snapshot.style) {
+        const snapshotType = keyframe.snapshot.type ?? clone.type;
+        ensureStyleHasFillStyle(keyframe.snapshot.style, snapshotType);
+      }
+    });
+  }
   normalizeShapeKeyframes(clone);
   return clone;
 }
@@ -4996,11 +7772,12 @@ function confineFreeformLive(live, stageWidth, stageHeight) {
 
 function confineLiveGeometry(type, live, stageWidth, stageHeight) {
   switch (type) {
-    case "rectangle":
-    case "square":
-    case "circle":
-    case "text":
-    case "image":
+  case "rectangle":
+  case "diamond":
+  case "square":
+  case "circle":
+  case "text":
+  case "image":
       confineRectLikeLive(live, stageWidth, stageHeight);
       break;
     case "line":
@@ -5044,7 +7821,8 @@ function applyImportedScene(payload) {
 
   const normalizedShapes = shapes.map((entry) => {
     const targetType = entry.type === "connector" ? "arrow" : entry.type;
-    const style = JSON.parse(JSON.stringify(entry.style || {}));
+  const style = JSON.parse(JSON.stringify(entry.style || {}));
+  ensureStyleHasFillStyle(style, targetType);
     if (targetType === "arrow") {
       style.arrowStart = Boolean(style.arrowStart);
       style.arrowEnd = style.arrowEnd !== undefined ? Boolean(style.arrowEnd) : true;
@@ -5064,6 +7842,9 @@ function applyImportedScene(payload) {
     keyframes.forEach((keyframe) => {
       if (keyframe.snapshot) {
         keyframe.snapshot.type = targetType;
+        if (keyframe.snapshot.style) {
+          ensureStyleHasFillStyle(keyframe.snapshot.style, targetType);
+        }
         if (keyframe.snapshot.bindings) {
           delete keyframe.snapshot.bindings;
         }
@@ -5083,6 +7864,8 @@ function applyImportedScene(payload) {
     if (targetType === "arrow" && shape.live && shape.live.bindings) {
       delete shape.live.bindings;
     }
+
+  ensureStyleHasFillStyle(shape.style, shape.type);
 
     if (entry.asset && entry.asset.source) {
       shape.asset = {
@@ -5128,7 +7911,7 @@ function applyImportedScene(payload) {
 
   state.shapes.forEach((shape) => {
     if (shape.type === "text") {
-      shape.style.fontFamily = shape.style.fontFamily || state.style.fontFamily || "Inter";
+      shape.style.fontFamily = shape.style.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT;
       shape.style.fontSize = Math.max(6, Number(shape.style.fontSize) || state.style.fontSize || 32);
       if (typeof shape.style.rotation === "number") {
         // assume stored in degrees
@@ -5143,7 +7926,26 @@ function applyImportedScene(payload) {
       if (typeof shape.live.text !== "string") {
         shape.live.text = "";
       }
-      updateTextMetrics(shape, { preserveOrigin: true });
+      const keepCenter = Math.abs(shape.live.rotation || 0) > 0.001 || Math.abs(shape.style.rotation || 0) > 0.001;
+      updateTextMetrics(shape, keepCenter ? { keepCenter: true } : { preserveOrigin: true });
+      if (Array.isArray(shape.keyframes)) {
+        shape.keyframes.forEach((keyframe) => {
+          if (!keyframe || !keyframe.snapshot) return;
+          if ((keyframe.snapshot.type || shape.type) !== "text") return;
+          let rawSnapshotRotation = null;
+          if (keyframe.snapshot.live && typeof keyframe.snapshot.live.rotation === "number") {
+            rawSnapshotRotation = keyframe.snapshot.live.rotation;
+          } else if (typeof keyframe.snapshot.style?.rotation === "number") {
+            rawSnapshotRotation = degreesToRadians(keyframe.snapshot.style.rotation);
+          }
+          const referenceRotation = rawSnapshotRotation !== null ? rawSnapshotRotation : shape.live.rotation || 0;
+          const snapshotKeepCenter = Math.abs(referenceRotation) > 0.001;
+          refreshTextSnapshotMetrics(keyframe.snapshot, {
+            fallbackStyle: shape.style,
+            keepCenter: snapshotKeepCenter,
+          });
+        });
+      }
     }
     ensureBaseKeyframe(shape, shape.birthTime ?? 0);
   });
@@ -5303,7 +8105,7 @@ function createAnimatorApi() {
         return toClientPoint(shape.live?.end);
       }
       let point = null;
-      if (shape.type === "rectangle" || shape.type === "square" || shape.type === "circle" || shape.type === "image" || shape.type === "text") {
+  if (shape.type === "rectangle" || shape.type === "diamond" || shape.type === "square" || shape.type === "circle" || shape.type === "image" || shape.type === "text") {
         point = getRectResizeHandlePosition(shape);
       }
       if (!point) {
@@ -5336,6 +8138,11 @@ function createAnimatorApi() {
       const start = shape.live?.start;
       const end = shape.live?.end;
       if (!start || !end) return null;
+      if (shape.type === "line") {
+        const handle = getLineBendHandlePosition(shape);
+        if (!handle) return null;
+        return toClientPoint(handle);
+      }
       const mid = {
         x: (start.x + end.x) / 2,
         y: (start.y + end.y) / 2,
@@ -5348,11 +8155,30 @@ function createAnimatorApi() {
       };
       return toClientPoint(control);
     },
+    getLineBendHandleClientPoint(targetId) {
+      const shape = resolveShape(targetId);
+      if (!shape || shape.type !== "line") return null;
+      const handle = getLineBendHandlePosition(shape);
+      if (!handle) return null;
+      return toClientPoint(handle);
+    },
     copySelection() {
       return copySelectionToClipboard();
     },
     pasteFromClipboard() {
       return pasteClipboardItems();
+    },
+    selectAll() {
+      return selectAllShapes();
+    },
+    clearSelection() {
+      return clearSelection();
+    },
+    groupSelection() {
+      return groupSelectedShapes();
+    },
+    ungroupSelection() {
+      return ungroupSelectedShapes();
     },
     clearCanvas() {
       if (state.shapes.length === 0) {

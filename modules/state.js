@@ -26,12 +26,13 @@ const state = {
   },
   style: {
     fill: elements.fillColor.value,
+    fillStyle: getInitialOption(elements.fillStyleButtons, "fillStyle", "cross-hatch"),
     stroke: elements.strokeColor.value,
     strokeWidth: Number(elements.strokeWidth.value),
     fontFamily: elements.fontFamily.value,
     fontSize: 32,
     strokeStyle: getInitialOption(elements.strokeStyleButtons, "strokeStyle", "solid"),
-    edgeStyle: getInitialOption(elements.edgeStyleButtons, "edgeStyle", "curved"),
+  edgeStyle: getInitialOption(elements.edgeStyleButtons, "edgeStyle", "round"),
     sloppiness: getInitialOption(elements.sloppinessButtons, "sloppiness", "neat"),
     opacity: elements.opacity ? Number(elements.opacity.value) / 100 : 1,
     rotation: 0,
@@ -152,6 +153,7 @@ function canRotateShape(shape) {
   if (isConnectorShape(shape)) return true;
   return (
     shape.type === "rectangle" ||
+    shape.type === "diamond" ||
     shape.type === "square" ||
     shape.type === "circle" ||
     shape.type === "text" ||
@@ -164,6 +166,7 @@ function getShapeCenter(shape) {
   if (!shape) return null;
   switch (shape.type) {
     case "rectangle":
+    case "diamond":
     case "square":
     case "circle":
     case "text":
@@ -210,7 +213,8 @@ function getShapeCenter(shape) {
 function getShapeBounds(shape) {
   if (!shape) return { x: 0, y: 0, width: 0, height: 0 };
   switch (shape.type) {
-    case "rectangle":
+  case "rectangle":
+  case "diamond":
     case "square":
     case "circle":
     case "text": {

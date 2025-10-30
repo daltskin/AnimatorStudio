@@ -500,6 +500,97 @@ test.describe('Timeline interactions', () => {
     ).toBeTruthy();
   });
 
+  test('keyframe chips list all shapes and auto-select on click', async ({ page }) => {
+    await loadApp(page);
+
+    await setTool(page, 'rectangle');
+    await drawRectangle(page, { offsetX: -180 });
+    await ensureSelectionCount(page, 1);
+
+    const firstId = await page.evaluate(() => window.animatorState.selection?.id ?? null);
+    expect(firstId).not.toBeNull();
+
+    await setTimelineTime(page, 1);
+    await page.click('#addKeyframe');
+
+    await drawRectangle(page, { offsetX: 180 });
+    await ensureSelectionCount(page, 1);
+
+    const secondId = await page.evaluate(() => window.animatorState.selection?.id ?? null);
+    expect(secondId).not.toBeNull();
+    expect(secondId).not.toBe(firstId);
+
+    await setTimelineTime(page, 2);
+    await page.click('#addKeyframe');
+
+    await expect.poll(() => page.locator('.keyframe-chip').count()).toBeGreaterThanOrEqual(4);
+
+    const chipData = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('.keyframe-chip')).map((chip) => ({
+        shapeId: Number(chip.getAttribute('data-shape-id')),
+        time: Number(chip.getAttribute('data-keyframe-time')),
+      })),
+    );
+
+    expect(chipData.filter((entry) => entry.shapeId === firstId).length).toBeGreaterThanOrEqual(2);
+    expect(
+      chipData.some(
+        (entry) =>
+          entry.shapeId === firstId && (entry.time === 0 || Math.abs(entry.time - 1) < 0.001),
+      ),
+    ).toBeTruthy();
+    expect(chipData.filter((entry) => entry.shapeId === secondId).length).toBeGreaterThanOrEqual(2);
+    expect(
+      chipData.some(
+        (entry) =>
+          entry.shapeId === secondId && (entry.time === 0 || Math.abs(entry.time - 2) < 0.001),
+      ),
+    ).toBeTruthy();
+
+    await page.evaluate(() => window.animatorApi.clearSelection());
+    await ensureSelectionCount(page, 0);
+
+    await expect.poll(() => page.locator('.keyframe-chip').count()).toBe(chipData.length);
+
+    await page.evaluate(
+      ({ shapeId, time }) => {
+        const chip = Array.from(document.querySelectorAll('.keyframe-chip')).find((node) => {
+          const nodeShapeId = Number(node.getAttribute('data-shape-id'));
+          const nodeTime = Number(node.getAttribute('data-keyframe-time'));
+          return nodeShapeId === shapeId && Math.abs(nodeTime - time) < 0.001;
+        });
+        if (!chip) {
+          throw new Error('Expected keyframe chip not found');
+        }
+        chip.click();
+      },
+      { shapeId: firstId, time: 1 },
+    );
+
+    await expect.poll(() => page.evaluate(() => window.animatorState.selection?.id ?? null)).toBe(
+      firstId,
+    );
+    await expect.poll(() => page.evaluate(() => window.animatorState.timeline.selectedKeyframeShapeId ?? null)).toBe(
+      firstId,
+    );
+    await expect.poll(() =>
+      page.evaluate(
+        ({ shapeId, targetTime }) => {
+          const chip = Array.from(document.querySelectorAll('.keyframe-chip')).find((node) => {
+            const nodeShapeId = Number(node.getAttribute('data-shape-id'));
+            const nodeTime = Number(node.getAttribute('data-keyframe-time'));
+            return nodeShapeId === shapeId && Math.abs(nodeTime - targetTime) < 0.001;
+          });
+          return Boolean(chip && chip.classList.contains('selected'));
+        },
+        { shapeId: firstId, targetTime: 1 },
+      ),
+    ).toBeTruthy();
+    await expect.poll(() =>
+      page.evaluate(() => Number(window.animatorState.timeline.selectedKeyframeTime ?? Number.NaN)),
+    ).toBeCloseTo(1, 5);
+  });
+
   test('keyframe chips can be selected and deleted via keyboard', async ({ page }) => {
     await loadApp(page);
 

@@ -16,7 +16,7 @@
     <div class="app-shell">
       <header class="app-header">
         <div class="app-brand">
-          <img src="images/logo_small.png" alt="Animator Studio Logo" />
+            <img src="images/logo_small.png" alt="Animator Studio logo displayed as a small icon featuring animation-themed imagery" style="max-height: 25px; transform: rotate(-15deg);" />
           <h1>Animator Studio</h1>
         </div>
         <div class="header-actions">
@@ -37,7 +37,26 @@
       <div class="workspace">
         <aside class="toolbar" aria-label="Editor controls">
           <div class="toolbar-section">
-            <h2>Appearance</h2>
+            <div class="toolbar-section-header">
+              <h2>Appearance</h2>
+              <button
+                type="button"
+                class="toolbar-toggle tool-menu-toggle icon-only"
+                data-toolbar-toggle
+                aria-pressed="false"
+                aria-label="Hide toolbar"
+                title="Hide the toolbar"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
+                  <path d="M14 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M18 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                </svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
+                  <path d="M10 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  <path d="M6 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                </svg>
+              </button>
+            </div>
             <div class="control color-controls" role="group" aria-label="Fill and stroke colours">
               <label class="color-control">
                 <span class="control-label">Fill</span>
@@ -53,33 +72,104 @@
               <input type="range" id="strokeWidth" min="1" max="12" value="3" title="Adjust stroke width" />
               <span id="strokeWidthValue" class="value">3px</span>
             </label>
+            <div class="control icon-toggle-group" id="strokeStyleControl">
+              <span class="control-label">Stroke style</span>
+              <div class="icon-toggle-row" role="radiogroup" aria-label="Stroke style">
+                <button type="button" class="icon-toggle selected" data-stroke-style="solid" aria-pressed="true" title="Draw solid outlines">
+                  <span class="sr-only">Solid stroke</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 12h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                  </svg>
+                </button>
+                <button type="button" class="icon-toggle" data-stroke-style="dashed" aria-pressed="false" title="Draw dashed outlines">
+                  <span class="sr-only">Dashed stroke</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 12h4m4 0h4m4 0h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="8 6"></path>
+                  </svg>
+                </button>
+                <button type="button" class="icon-toggle" data-stroke-style="dotted" aria-pressed="false" title="Draw dotted outlines">
+                  <span class="sr-only">Dotted stroke</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M4 12h0m4 0h0m4 0h0m4 0h0m4 0h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
             <div class="control icon-toggle-group" id="sketchControl">
               <span class="control-label">Sketchiness</span>
               <div class="icon-toggle-row" role="radiogroup" aria-label="Sketchiness">
-                <button type="button" class="icon-toggle" data-sketch-level="0" aria-pressed="true" title="Use clean strokes">
-                  <span class="sr-only">Clean</span>
+                  <button type="button" class="icon-toggle selected" data-sketch-level="0" aria-pressed="true" title="Architect straight lines">
+                    <span class="sr-only">Architect</span>
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="M4 12h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                   </svg>
                 </button>
-                <button type="button" class="icon-toggle" data-sketch-level="1" aria-pressed="false" title="Add subtle wobble">
-                  <span class="sr-only">Casual</span>
+                  <button type="button" class="icon-toggle" data-sketch-level="1" aria-pressed="false" title="Artist slight overbrushed lines">
+                    <span class="sr-only">Artist</span>
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="M4 12c3 0 3-4 6-4s3 4 6 4 3-4 6-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                   </svg>
                 </button>
-                <button type="button" class="icon-toggle" data-sketch-level="2" aria-pressed="false" title="Make lines feel hand-drawn">
-                  <span class="sr-only">Messy</span>
+                  <button type="button" class="icon-toggle" data-sketch-level="2" aria-pressed="false" title="Cartoonist heavier overbrushed lines">
+                    <span class="sr-only">Cartoonist</span>
                   <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="M4 11.5c2 3 4-3 6-1.5s2 4.5 4 3 2-4 4-2 2 4 4 1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                   </svg>
                 </button>
               </div>
             </div>
+            <div class="control icon-toggle-group" id="fillStyleControl">
+              <span class="control-label">Fill style</span>
+              <div class="icon-toggle-row" role="radiogroup" aria-label="Fill style">
+                <button type="button" class="icon-toggle" data-fill-style="solid" aria-pressed="false" title="Use a solid fill">
+                  <span class="sr-only">Solid fill</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+                  </svg>
+                </button>
+                <button type="button" class="icon-toggle selected" data-fill-style="cross-hatch" aria-pressed="true" title="Fill with cross-hatch pattern">
+                  <span class="sr-only">Cross-hatch fill</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                    <path d="M8 8l8 8m0-8l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" class="icon-toggle" data-fill-style="hachure" aria-pressed="false" title="Fill with angled hatch lines">
+                  <span class="sr-only">Hachure fill</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                    <path d="M8 18l8-8M10 18l8-8M12 18l8-8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="control icon-toggle-group" id="edgeStyleControl">
+              <span class="control-label">Edge style</span>
+              <div class="icon-toggle-row" role="radiogroup" aria-label="Edge style">
+                <button type="button" class="icon-toggle" data-edge-style="sharp" aria-pressed="false" title="Draw sharp corners">
+                  <span class="sr-only">Sharp corners</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="6" y="6" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="miter" />
+                  </svg>
+                </button>
+                <button type="button" class="icon-toggle selected" data-edge-style="round" aria-pressed="true" title="Use rounded corners">
+                  <span class="sr-only">Rounded corners</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <rect x="6" y="6" width="12" height="12" rx="4" ry="4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <label class="control">
+              <span class="control-label">Opacity</span>
+              <input type="range" id="opacity" min="0" max="100" value="100" title="Adjust fill opacity" />
+              <span id="opacityValue" class="value">100%</span>
+            </label>
             <label class="control">
               <span class="control-label">Font family</span>
               <select id="fontFamily" title="Choose the font for text shapes">
-                <option value="Inter" selected>Inter — Clean Sans</option>
+                <option value="Excalifont" selected>Excalifont — Hand-drawn Sans</option>
+                <option value="Inter">Inter — Clean Sans</option>
                 <option value="Poppins">Poppins — Rounded Sans</option>
                 <option value="Roboto">Roboto — Classic Sans</option>
                 <option value="Montserrat">Montserrat — Geometric Sans</option>
@@ -132,6 +222,23 @@
         </aside>
 
         <section class="stage-area">
+          <button
+            type="button"
+            class="toolbar-toggle toolbar-toggle-floating icon-only"
+            data-toolbar-toggle
+            aria-pressed="false"
+            aria-label="Show toolbar"
+            title="Show the toolbar"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
+              <path d="M15 5l-6 7 6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M19 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
+              <path d="M9 5l6 7-6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M5 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+          </button>
           <div class="canvas-wrapper">
             <div class="floating-tool-menu" aria-label="Canvas tools and actions">
               <div class="tool-cluster" role="radiogroup" aria-label="Shape tools">
@@ -147,6 +254,12 @@
                   </svg>
                   <span class="tool-label">Rectangle</span>
                 </button>
+                <button data-tool="diamond" class="tool-button" aria-pressed="false" aria-label="Diamond tool" title="Draw a diamond">
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M12 3l8 9-8 9-8-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                  </svg>
+                  <span class="tool-label">Diamond</span>
+                </button>
                 <button data-tool="square" class="tool-button" aria-pressed="false" aria-label="Square tool" title="Draw a square">
                   <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <rect x="6" y="6" width="12" height="12" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="1.8" />
@@ -158,6 +271,12 @@
                     <circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.8" />
                   </svg>
                   <span class="tool-label">Circle</span>
+                </button>
+                <button data-tool="line" class="tool-button" aria-pressed="false" aria-label="Line tool" title="Draw a straight line">
+                  <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                  </svg>
+                  <span class="tool-label">Line</span>
                 </button>
                 <button data-tool="arrow" class="tool-button" aria-pressed="false" aria-label="Arrow tool" title="Draw an arrow connector">
                   <svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -198,6 +317,21 @@
                   <span class="tool-label">Ungroup</span>
                 </button>
               </div>
+              <button
+                type="button"
+                class="toolbar-toggle tool-menu-toggle icon-only"
+                data-tool-menu-toggle
+                aria-pressed="false"
+                aria-label="Hide canvas tools"
+                title="Hide canvas tools"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
+                  <path d="M6 14l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
+                  <path d="M6 10l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+              </button>
             </div>
             <div class="stage-surface">
               <canvas id="stage" width="1280" height="720" role="application" aria-label="Animation canvas"></canvas>

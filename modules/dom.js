@@ -4,10 +4,13 @@ const ctx = canvas.getContext("2d");
 const elements = {
   toolGrid: document.querySelector(".tool-grid"),
   canvasWrapper: document.querySelector(".canvas-wrapper"),
+  floatingToolMenu: document.querySelector(".floating-tool-menu"),
+  toolMenuToggle: document.querySelector("[data-tool-menu-toggle]"),
   stageShell: document.getElementById("stageShell"),
   stageDimensions: document.getElementById("stageDimensions"),
   stageResizeHandles: Array.from(document.querySelectorAll(".stage-resize-handle")),
   fillColor: document.getElementById("fillColor"),
+  fillStyleButtons: Array.from(document.querySelectorAll("[data-fill-style]")),
   strokeColor: document.getElementById("strokeColor"),
   strokeWidth: document.getElementById("strokeWidth"),
   strokeWidthValue: document.getElementById("strokeWidthValue"),

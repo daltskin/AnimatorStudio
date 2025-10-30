@@ -9,7 +9,7 @@ COPY . .
 
 RUN mkdir -p /out \
 	&& cp index.html app.js gifEncoder.js styles.css /out/ \
-	&& cp -r modules images samples /out/ \
+	&& cp -r modules images samples fonts /out/ \
 	&& cp -r node_modules /out/
 
 # Final runtime image uses nginx to serve static assets

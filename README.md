@@ -105,6 +105,11 @@ npm test
 
 > Tip: `npx playwright test --ui` launches the interactive runner if you prefer exploratory debugging.
 
+## 📄 Licensing
+
+- Animator Studio is released under the [MIT License](LICENSE).
+- The bundled **Excalifont** typeface is © Excalidraw and provided under the [OFL-1.1 License](https://plus.excalidraw.com/excalifont).
+
 # Future roadmap
 
 - Add more samples, using layered shapes to create depth in the scene including:
