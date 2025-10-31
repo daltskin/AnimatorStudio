@@ -11,10 +11,10 @@ Have a play with it [here](https://animatorstudio.gentlebay-3289cfef.westus2.azu
 - **Rich shape library:** Rectangle, square, circle, arrow, straight line, and free-draw pen.
 - **Direct manipulation:** Click to place shapes, drag to reposition, and pull the golden handle to resize (with live aspect locking for squares and radius control for circles).
 - **Instant selection:** Newly drawn shapes auto-select so you can tweak styling or keyframes without swapping tools.
-- **Precision stacking:** Only the active selection responds to move, resize, and rotate handles, preventing stray edits to shapes tucked above or below.
+- **Precision stacking:** Draw shapes freely on top of each other; only the select tool interacts with existing shapes, while drawing tools let you layer new shapes anywhere on the canvas.
 - **Smart styling controls:** Update fill, stroke, stroke width, and sketchiness on the fly; selections keep the sidebar controls in sync.
 - **Expanded typography:** Pick from a broader mix of handwriting, freestyle, display, and serif fonts—no more grouped options.
-- **Animated connectors:** Arrow and Line tools stay editable, exposing bend + arrowhead toggles for fast callouts.
+- **Animated connectors:** Arrow and Line tools stay editable, exposing bend + arrowhead toggles for fast callouts. Both lines and arrows support curves via the bend handle.
 - **Stage colour control:** Right-click the canvas to open the stage context menu, pick a background colour, or reset to the default—settings persist between sessions and export with the scene.
 - **Grouping that sticks:** Combine shapes, move them as a unit, and ungroup when you need to iterate; marquee selection respects grouped clusters.
 - **Mermaid diagram support:** Paste Mermaid diagram syntax (flowcharts, sequence diagrams, class diagrams, etc.) and it auto-renders as a high-quality image shape ready for animation.

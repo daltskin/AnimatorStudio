@@ -1907,11 +1907,25 @@ function drawArrowShape(context, shape) {
   drawLineShape(context, shape);
 
   const headLength = Math.max(8, style.strokeWidth * 3);
-  if (style.arrowEnd) {
-    drawArrowHead(context, live.start, live.end, headLength, style);
-  }
-  if (style.arrowStart) {
-    drawArrowHead(context, live.end, live.start, headLength, style);
+  
+  // For curved arrows, we need to calculate the tangent direction at the endpoints
+  if (live.control) {
+    // For quadratic curves, tangent at end = direction from control to end
+    // For tangent at start = direction from start to control
+    if (style.arrowEnd) {
+      drawArrowHead(context, live.control, live.end, headLength, style);
+    }
+    if (style.arrowStart) {
+      drawArrowHead(context, live.control, live.start, headLength, style);
+    }
+  } else {
+    // Straight line - use start and end directly
+    if (style.arrowEnd) {
+      drawArrowHead(context, live.start, live.end, headLength, style);
+    }
+    if (style.arrowStart) {
+      drawArrowHead(context, live.end, live.start, headLength, style);
+    }
   }
 }
 
@@ -2009,7 +2023,7 @@ function drawShapeSelectionOutline(context, shape, { includeHandles = true } = {
   if (shape.type === "line" || shape.type === "arrow") {
     context.beginPath();
     context.moveTo(shape.live.start.x, shape.live.start.y);
-    if (shape.live.control && shape.type === "line") {
+    if (shape.live.control) {
       context.quadraticCurveTo(shape.live.control.x, shape.live.control.y, shape.live.end.x, shape.live.end.y);
     } else {
       context.lineTo(shape.live.end.x, shape.live.end.y);
@@ -2018,7 +2032,7 @@ function drawShapeSelectionOutline(context, shape, { includeHandles = true } = {
     if (includeHandles) {
       drawLineEndpointHandle(context, shape.live.start);
       drawLineEndpointHandle(context, shape.live.end);
-      if (shape.type === "line") {
+      if (shape.type === "line" || shape.type === "arrow") {
         drawLineBendHandle(context, getLineBendHandlePosition(shape));
       }
     }
@@ -2446,7 +2460,11 @@ function handlePointerDown(event) {
     }
   }
 
-  if (!shape) {
+  // Only check for shape hits when in select tool or text tool
+  // Drawing tools should be able to draw over existing shapes
+  const isDrawingTool = state.tool !== "select" && state.tool !== "text";
+  
+  if (!shape && !isDrawingTool) {
     shape = hitTest(point);
   }
 
@@ -3608,7 +3626,7 @@ function resizeLineEndpoint(shape, point, mode) {
 }
 
 function bendLineShape(shape, point) {
-  if (!shape || shape.type !== "line") return;
+  if (!shape || (shape.type !== "line" && shape.type !== "arrow")) return;
   const { start, end } = shape.live || {};
   if (!start || !end) return;
   markHistoryChanged();
@@ -3642,12 +3660,10 @@ function rotateShape(shape, point) {
   } else if (shape.type === "line" || shape.type === "arrow") {
     shape.live.start = rotatePoint(snapshot.start, center, delta);
     shape.live.end = rotatePoint(snapshot.end, center, delta);
-    if (shape.type === "line") {
-      if (snapshot.control) {
-        shape.live.control = rotatePoint(snapshot.control, center, delta);
-      } else {
-        delete shape.live.control;
-      }
+    if (snapshot.control) {
+      shape.live.control = rotatePoint(snapshot.control, center, delta);
+    } else {
+      delete shape.live.control;
     }
   } else if (shape.type === "free") {
     shape.live.points = snapshot.points.map((pt) => rotatePoint(pt, center, delta));
@@ -3683,12 +3699,10 @@ function applyRotationSnapshotToShape(shape, snapshot, center, delta) {
       if (!snapshot.start || !snapshot.end) return;
       shape.live.start = rotatePoint(snapshot.start, center, delta);
       shape.live.end = rotatePoint(snapshot.end, center, delta);
-      if (shape.type === "line") {
-        if (snapshot.control) {
-          shape.live.control = rotatePoint(snapshot.control, center, delta);
-        } else {
-          delete shape.live.control;
-        }
+      if (snapshot.control) {
+        shape.live.control = rotatePoint(snapshot.control, center, delta);
+      } else {
+        delete shape.live.control;
       }
       return;
     }
@@ -3742,7 +3756,7 @@ function detectLineEndpointHandle(shape, point) {
 }
 
 function detectLineBendHandle(shape, point) {
-  if (!shape || shape.type !== "line") return null;
+  if (!shape || (shape.type !== "line" && shape.type !== "arrow")) return null;
   const position = getLineBendHandlePosition(shape);
   if (!position) return null;
   const radius = Math.max(14, (shape.style?.strokeWidth || 1) + 8);
@@ -8407,7 +8421,7 @@ function getLineBendOffsetFromPoint(start, end, point) {
 }
 
 function getLineBendHandlePosition(shape) {
-  if (!shape || shape.type !== "line") return null;
+  if (!shape || (shape.type !== "line" && shape.type !== "arrow")) return null;
   const { start, end, control } = shape.live || {};
   if (!start || !end) return null;
   if (control && Number.isFinite(control.x) && Number.isFinite(control.y)) {
@@ -9229,7 +9243,7 @@ function createAnimatorApi() {
     },
     getLineBendHandleClientPoint(targetId) {
       const shape = resolveShape(targetId);
-      if (!shape || shape.type !== "line") return null;
+      if (!shape || (shape.type !== "line" && shape.type !== "arrow")) return null;
       const handle = getLineBendHandlePosition(shape);
       if (!handle) return null;
       return toClientPoint(handle);
