@@ -69,6 +69,10 @@ const state = {
     usingPointerEvents: false,
     selectionBounds: null,
   },
+  alignmentGuides: {
+    vertical: [],   // Array of x coordinates
+    horizontal: [], // Array of y coordinates
+  },
   clipboard: null,
 };
 

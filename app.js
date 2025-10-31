@@ -326,6 +326,10 @@ const state = {
     meta: false,
     alt: false,
   },
+  alignmentGuides: {
+    vertical: [],   // Array of x coordinates
+    horizontal: [], // Array of y coordinates
+  },
   history: {
     undoStack: [],
     limit: HISTORY_LIMIT,
@@ -1357,6 +1361,7 @@ function render() {
     drawBackgroundGrid(ctx);
   }
   drawShapes(ctx);
+  drawAlignmentGuides(ctx);
   drawSelectionBounds(ctx);
   ctx.restore();
 
@@ -2200,6 +2205,36 @@ function drawSelectionBounds(context) {
   context.restore();
 }
 
+function drawAlignmentGuides(context) {
+  if (state.pointer.mode !== "moving") return;
+  
+  const { vertical, horizontal } = state.alignmentGuides;
+  if (vertical.length === 0 && horizontal.length === 0) return;
+  
+  context.save();
+  context.strokeStyle = "rgba(255, 0, 255, 0.7)"; // Magenta for visibility
+  context.lineWidth = 1;
+  context.setLineDash([4, 4]);
+  
+  // Draw vertical guides (across the full stage height)
+  vertical.forEach(x => {
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, state.stage.height);
+    context.stroke();
+  });
+  
+  // Draw horizontal guides (across the full stage width)
+  horizontal.forEach(y => {
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(state.stage.width, y);
+    context.stroke();
+  });
+  
+  context.restore();
+}
+
 function drawResizeHandle(context, x, y) {
   const size = 10;
   context.save();
@@ -2594,31 +2629,51 @@ function handlePointerMove(event) {
     "bending-line",
   ].includes(state.pointer.mode)) {
     switch (state.pointer.mode) {
-      case "moving":
+      case "moving": {
+        const movingShapes = state.pointer.multiSnapshot && state.pointer.multiSnapshot.size > 0
+          ? Array.from(state.selectedIds).map(id => getShapeById(id)).filter(Boolean)
+          : [state.selection];
+        
+        // Calculate alignment guides and snap deltas
+        const snapDelta = calculateAlignmentGuides(movingShapes, state.modifiers.ctrl || state.modifiers.meta);
+        
         if (state.pointer.multiSnapshot && state.pointer.multiSnapshot.size > 0) {
           state.pointer.multiSnapshot.forEach((snapshot, id) => {
             const target = state.shapes.find((shape) => shape.id === id);
             if (!target) return;
-            moveShape(target, point, snapshot);
+            moveShape(target, point, snapshot, snapDelta);
           });
         } else {
-          moveShape(state.selection, point);
+          moveShape(state.selection, point, state.pointer.startSnapshot, snapDelta);
         }
         break;
-      case "resizing":
+      }
+      case "resizing": {
         if (state.pointer.multiSnapshot && state.pointer.multiSnapshot.size > 0) {
           resizeGroupSelection(point);
+          // Calculate alignment guides for group resize
+          const resizingShapes = Array.from(state.selectedIds).map(id => getShapeById(id)).filter(Boolean);
+          calculateAlignmentGuides(resizingShapes, state.modifiers.ctrl || state.modifiers.meta);
         } else {
           resizeShape(state.selection, point);
+          // Calculate alignment guides for single shape resize
+          calculateAlignmentGuides([state.selection], state.modifiers.ctrl || state.modifiers.meta);
         }
         break;
-      case "rotating":
+      }
+      case "rotating": {
         if (state.pointer.multiSnapshot && state.pointer.multiSnapshot.size > 0) {
           rotateGroupSelection(point);
+          // Calculate alignment guides for group rotation
+          const rotatingShapes = Array.from(state.selectedIds).map(id => getShapeById(id)).filter(Boolean);
+          calculateAlignmentGuides(rotatingShapes, state.modifiers.ctrl || state.modifiers.meta);
         } else {
           rotateShape(state.selection, point);
+          // Calculate alignment guides for single shape rotation
+          calculateAlignmentGuides([state.selection], state.modifiers.ctrl || state.modifiers.meta);
         }
         break;
+      }
       case "resizing-line-start":
       case "resizing-line-end":
         resizeLineEndpoint(state.selection, point, state.pointer.mode);
@@ -2659,6 +2714,10 @@ function resetPointerInteraction() {
   state.pointer.usingPointerEvents = false;
   state.pointer.touchIdentifier = null;
   hideMarqueeOverlay();
+  
+  // Clear alignment guides
+  state.alignmentGuides.vertical = [];
+  state.alignmentGuides.horizontal = [];
 }
 
 function handlePointerUp(event) {
@@ -3141,12 +3200,142 @@ function repositionActiveTextEditor() {
   active.element.style.fontSize = `${Math.max(6, shape.style.fontSize || state.style.fontSize || 32)}px`;
 }
 
-function moveShape(shape, point, startSnapshot = state.pointer.startSnapshot) {
+function calculateAlignmentGuides(movingShapes, ctrlPressed) {
+  // Reset guides
+  state.alignmentGuides.vertical = [];
+  state.alignmentGuides.horizontal = [];
+  
+  if (!ctrlPressed) return { snapX: 0, snapY: 0 };
+  
+  const SNAP_THRESHOLD = 10; // pixels - increased for easier alignment
+  const movingIds = new Set(movingShapes.map(s => s.id));
+  
+  // Get bounds of moving shapes
+  const movingBounds = getSelectionBoundingRect(movingShapes);
+  if (!movingBounds) return { snapX: 0, snapY: 0 };
+  
+  const movingCenterX = movingBounds.x + movingBounds.width / 2;
+  const movingCenterY = movingBounds.y + movingBounds.height / 2;
+  const movingLeft = movingBounds.x;
+  const movingRight = movingBounds.x + movingBounds.width;
+  const movingTop = movingBounds.y;
+  const movingBottom = movingBounds.y + movingBounds.height;
+  
+  // Get all stationary shapes
+  const stationaryShapes = state.shapes.filter(s => !movingIds.has(s.id) && s.isVisible !== false);
+  
+  // Track closest alignments for snapping
+  let closestVertical = null;
+  let closestVerticalDist = SNAP_THRESHOLD;
+  let closestHorizontal = null;
+  let closestHorizontalDist = SNAP_THRESHOLD;
+  
+  // Check alignment with each stationary shape
+  stationaryShapes.forEach(shape => {
+    const bounds = getShapeBounds(shape);
+    if (!bounds) return;
+    
+    const centerX = bounds.x + bounds.width / 2;
+    const centerY = bounds.y + bounds.height / 2;
+    const left = bounds.x;
+    const right = bounds.x + bounds.width;
+    const top = bounds.y;
+    const bottom = bounds.y + bounds.height;
+    
+    // Check vertical alignment (centers)
+    const centerXDist = Math.abs(movingCenterX - centerX);
+    if (centerXDist < SNAP_THRESHOLD) {
+      if (!state.alignmentGuides.vertical.includes(centerX)) {
+        state.alignmentGuides.vertical.push(centerX);
+      }
+      if (centerXDist < closestVerticalDist) {
+        closestVerticalDist = centerXDist;
+        closestVertical = { target: centerX, source: movingCenterX, type: 'center' };
+      }
+    }
+    
+    // Check vertical alignment (left edges)
+    const leftDist = Math.abs(movingLeft - left);
+    if (leftDist < SNAP_THRESHOLD) {
+      if (!state.alignmentGuides.vertical.includes(left)) {
+        state.alignmentGuides.vertical.push(left);
+      }
+      if (leftDist < closestVerticalDist) {
+        closestVerticalDist = leftDist;
+        closestVertical = { target: left, source: movingLeft, type: 'left' };
+      }
+    }
+    
+    // Check vertical alignment (right edges)
+    const rightDist = Math.abs(movingRight - right);
+    if (rightDist < SNAP_THRESHOLD) {
+      if (!state.alignmentGuides.vertical.includes(right)) {
+        state.alignmentGuides.vertical.push(right);
+      }
+      if (rightDist < closestVerticalDist) {
+        closestVerticalDist = rightDist;
+        closestVertical = { target: right, source: movingRight, type: 'right' };
+      }
+    }
+    
+    // Check horizontal alignment (centers)
+    const centerYDist = Math.abs(movingCenterY - centerY);
+    if (centerYDist < SNAP_THRESHOLD) {
+      if (!state.alignmentGuides.horizontal.includes(centerY)) {
+        state.alignmentGuides.horizontal.push(centerY);
+      }
+      if (centerYDist < closestHorizontalDist) {
+        closestHorizontalDist = centerYDist;
+        closestHorizontal = { target: centerY, source: movingCenterY, type: 'center' };
+      }
+    }
+    
+    // Check horizontal alignment (top edges)
+    const topDist = Math.abs(movingTop - top);
+    if (topDist < SNAP_THRESHOLD) {
+      if (!state.alignmentGuides.horizontal.includes(top)) {
+        state.alignmentGuides.horizontal.push(top);
+      }
+      if (topDist < closestHorizontalDist) {
+        closestHorizontalDist = topDist;
+        closestHorizontal = { target: top, source: movingTop, type: 'top' };
+      }
+    }
+    
+    // Check horizontal alignment (bottom edges)
+    const bottomDist = Math.abs(movingBottom - bottom);
+    if (bottomDist < SNAP_THRESHOLD) {
+      if (!state.alignmentGuides.horizontal.includes(bottom)) {
+        state.alignmentGuides.horizontal.push(bottom);
+      }
+      if (bottomDist < closestHorizontalDist) {
+        closestHorizontalDist = bottomDist;
+        closestHorizontal = { target: bottom, source: movingBottom, type: 'bottom' };
+      }
+    }
+  });
+  
+  // Calculate snap deltas
+  let snapX = 0;
+  let snapY = 0;
+  
+  if (closestVertical) {
+    snapX = closestVertical.target - closestVertical.source;
+  }
+  
+  if (closestHorizontal) {
+    snapY = closestHorizontal.target - closestHorizontal.source;
+  }
+  
+  return { snapX, snapY };
+}
+
+function moveShape(shape, point, startSnapshot = state.pointer.startSnapshot, snapDelta = { snapX: 0, snapY: 0 }) {
   if (!shape) return;
   if (!startSnapshot) return;
   markHistoryChanged();
-  const dx = point.x - state.pointer.start.x;
-  const dy = point.y - state.pointer.start.y;
+  const dx = point.x - state.pointer.start.x + snapDelta.snapX;
+  const dy = point.y - state.pointer.start.y + snapDelta.snapY;
 
   if (shape.type === "line" || shape.type === "arrow") {
     shape.live.start.x = startSnapshot.start.x + dx;

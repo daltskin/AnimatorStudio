@@ -18,6 +18,7 @@ Have a play with it [here](https://animatorstudio.gentlebay-3289cfef.westus2.azu
 - **Stage colour control:** Right-click the canvas to open the stage context menu, pick a background colour, or reset to the default—settings persist between sessions and export with the scene.
 - **Grouping that sticks:** Combine shapes, move them as a unit, and ungroup when you need to iterate; marquee selection respects grouped clusters.
 - **Mermaid diagram support:** Paste Mermaid diagram syntax (flowcharts, sequence diagrams, class diagrams, etc.) and it auto-renders as a high-quality image shape ready for animation.
+- **Alignment guides & snapping:** Hold CTRL (or CMD on Mac) while moving, resizing, or rotating shapes to see visual alignment guides and snap to other shapes for pixel-perfect positioning.
 - **Timeline-first workflow:** Scrub or type the duration, drop keyframes per shape, and play back loops or bounce animations with one click.
 - **Scene + GIF export:** Download JSON snapshots for round-tripping or capture animated GIFs directly from the timeline.
 
@@ -65,6 +66,15 @@ If you're using VS Code with the Dev Containers extension (or GitHub Codespaces)
 
 - Right-click the stage to open the context menu for background colour selection and quick reset.
 - Stage dimensions can be resized from the lower-right handle; the readout updates live and persists between sessions.
+
+### Alignment Guides & Snapping
+
+Hold **CTRL** (Windows/Linux) or **CMD** (Mac) while moving, resizing, or rotating shapes to activate visual alignment guides. Magenta dashed lines appear when shapes are within 10 pixels of alignment, showing:
+
+- **Centers** (vertical and horizontal)
+- **Edges** (left, right, top, bottom)
+
+Shapes automatically snap to the nearest alignment point when moving, helping you achieve pixel-perfect layouts without guesswork. Release CTRL/CMD to disable guides and snapping.
 
 ## 🎬 Working with the Timeline
 
