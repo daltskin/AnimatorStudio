@@ -447,6 +447,11 @@
       <button type="button" data-z-action="send-to-back" role="menuitem">Send to back</button>
     </div>
 
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: false, theme: 'default' });
+      window.mermaid = mermaid;
+    </script>
     <script type="module" src="app.js"></script>
   </body>
 </html>

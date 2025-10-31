@@ -30,6 +30,7 @@ const TIPS_CONTENT = [
   { id: "background-grid", text: "Right-click the canvas and enable background grid for precise alignment." },
   { id: "svg-paste", text: "Paste SVG code to import vector graphics onto the canvas." },
   { id: "png-paste", text: "Paste PNG images from clipboard to add photos and raster graphics." },
+  { id: "mermaid-paste", text: "Paste Mermaid diagram syntax to automatically render flowcharts and diagrams." },
   { id: "group-shapes", text: "Select multiple shapes and use Group to move them together." },
 ];
 
@@ -5258,6 +5259,56 @@ function tryPasteExcalidrawText(text) {
   return pasteExcalidrawClipboardPayload(payload);
 }
 
+async function tryPasteMermaidText(text) {
+  if (typeof text !== "string") return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  // Detect common Mermaid diagram keywords
+  const mermaidKeywords = [
+    'graph', 'flowchart', 'sequenceDiagram', 'classDiagram', 'stateDiagram',
+    'erDiagram', 'journey', 'gantt', 'pie', 'gitGraph', 'mindmap', 'timeline'
+  ];
+  
+  const firstLine = trimmed.split('\n')[0].toLowerCase();
+  const isMermaid = mermaidKeywords.some(keyword => firstLine.includes(keyword.toLowerCase()));
+  
+  if (!isMermaid) return false;
+
+  // Check if mermaid library is loaded
+  if (typeof window.mermaid === 'undefined') {
+    console.warn('Mermaid library not loaded');
+    return false;
+  }
+
+  try {
+    // Generate a unique ID for the diagram
+    const diagramId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Render the Mermaid diagram to SVG
+    const { svg } = await window.mermaid.render(diagramId, trimmed);
+    
+    if (!svg) return false;
+
+    // Convert SVG to data URL and create as image shape (not fragmented SVG)
+    const svgBlob = new Blob([svg], { type: 'image/svg+xml' });
+    
+    // Convert to data URL using Promise-based approach
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(svgBlob);
+    });
+    
+    createImageShapeFromSourceInternal(dataUrl);
+    return true;
+  } catch (error) {
+    console.error('Failed to render Mermaid diagram:', error);
+    return false;
+  }
+}
+
 function pasteExcalidrawClipboardPayload(payload) {
   if (!payload || payload.type !== "excalidraw/clipboard") return false;
   const elements = Array.isArray(payload.elements)
@@ -5794,6 +5845,20 @@ function tryPasteGraphicsFromClipboard(clipboardData) {
     }
     if (typeof text === "string") {
       const trimmed = text.trim();
+      
+      // Try Mermaid first (async but fire-and-forget for better UX)
+      const mermaidKeywords = [
+        'graph', 'flowchart', 'sequenceDiagram', 'classDiagram', 'stateDiagram',
+        'erDiagram', 'journey', 'gantt', 'pie', 'gitGraph', 'mindmap', 'timeline'
+      ];
+      const firstLine = trimmed.split('\n')[0].toLowerCase();
+      if (mermaidKeywords.some(keyword => firstLine.includes(keyword.toLowerCase()))) {
+        tryPasteMermaidText(text).catch(error => {
+          console.error('Mermaid paste failed:', error);
+        });
+        return true;
+      }
+      
       if (trimmed.startsWith("data:image")) {
         createImageShapeFromSourceInternal(trimmed);
         return true;
