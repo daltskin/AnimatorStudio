@@ -13,11 +13,13 @@ test.describe('Mermaid diagram paste', () => {
     await page.evaluate((code) => {
       const clipboardData = new DataTransfer();
       clipboardData.setData('text/plain', code);
+      
       const pasteEvent = new ClipboardEvent('paste', {
         clipboardData,
         bubbles: true,
-        cancelable: true,
+        cancelable: true
       });
+      
       document.dispatchEvent(pasteEvent);
     }, mermaidCode);
 
@@ -394,4 +396,39 @@ test.describe('Mermaid diagram paste', () => {
 
     expect(shapeType).toBe('image');
   });
+
+  test('pasting Mermaid graph creates single image shape', async ({ page }) => {
+    await loadApp(page);
+
+    const mermaidCode = `graph LR
+    X --> Y
+    Y --> Z`;
+
+    await page.evaluate((code) => {
+      const clipboardData = new DataTransfer();
+      clipboardData.setData('text/plain', code);
+      const pasteEvent = new ClipboardEvent('paste', {
+        clipboardData,
+        bubbles: true,
+        cancelable: true
+      });
+      document.dispatchEvent(pasteEvent);
+    }, mermaidCode);
+
+    await page.waitForTimeout(3000);
+
+    const shapeCount = await page.evaluate(() => {
+      return window.animatorState.shapes.length;
+    });
+
+    // Should create only 1 image shape
+    expect(shapeCount).toBe(1);
+
+    const shapeType = await page.evaluate(() => {
+      return window.animatorState.shapes[0]?.type || null;
+    });
+
+    expect(shapeType).toBe('image');
+  });
+
 });

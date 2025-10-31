@@ -17,6 +17,7 @@ Have a play with it [here](https://animatorstudio.gentlebay-3289cfef.westus2.azu
 - **Animated connectors:** Arrow and Line tools stay editable, exposing bend + arrowhead toggles for fast callouts.
 - **Stage colour control:** Right-click the canvas to open the stage context menu, pick a background colour, or reset to the default—settings persist between sessions and export with the scene.
 - **Grouping that sticks:** Combine shapes, move them as a unit, and ungroup when you need to iterate; marquee selection respects grouped clusters.
+- **Mermaid diagram support:** Paste Mermaid diagram syntax (flowcharts, sequence diagrams, class diagrams, etc.) and it auto-renders as a high-quality image shape ready for animation.
 - **Timeline-first workflow:** Scrub or type the duration, drop keyframes per shape, and play back loops or bounce animations with one click.
 - **Scene + GIF export:** Download JSON snapshots for round-tripping or capture animated GIFs directly from the timeline.
 

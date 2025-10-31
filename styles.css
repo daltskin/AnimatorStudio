@@ -1039,6 +1039,18 @@ button.danger:disabled {
   outline: none;
 }
 
+.context-menu__divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0.5rem 0;
+}
+
+.context-menu__icon {
+  display: inline-block;
+  margin-right: 0.5rem;
+  opacity: 0.85;
+}
+
 .timeline {
   background: var(--timeline-bg);
   border-radius: 1.2rem;

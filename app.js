@@ -30,7 +30,7 @@ const TIPS_CONTENT = [
   { id: "background-grid", text: "Right-click the canvas and enable background grid for precise alignment." },
   { id: "svg-paste", text: "Paste SVG code to import vector graphics onto the canvas." },
   { id: "png-paste", text: "Paste PNG images from clipboard to add photos and raster graphics." },
-  { id: "mermaid-paste", text: "Paste Mermaid diagram syntax to automatically render flowcharts and diagrams." },
+  { id: "mermaid-paste", text: "Paste Mermaid diagram syntax (flowcharts, sequence diagrams, etc.) to create image shapes." },
   { id: "group-shapes", text: "Select multiple shapes and use Group to move them together." },
 ];
 
@@ -977,11 +977,17 @@ function bindEvents() {
     render();
   });
 
-  elements.stageContextMenu?.addEventListener("click", (event) => {
+  elements.stageContextMenu?.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const action = target.getAttribute("data-stage-action");
-    if (action === "reset-background") {
+    
+    if (action === "paste") {
+      event.preventDefault();
+      closeStageContextMenu();
+      // Trigger paste from clipboard
+      await triggerPasteFromClipboard(false);
+    } else if (action === "reset-background") {
       event.preventDefault();
       applyStageBackground(getDefaultStageBackground(), { updateControl: true });
       closeStageContextMenu();
@@ -5259,7 +5265,525 @@ function tryPasteExcalidrawText(text) {
   return pasteExcalidrawClipboardPayload(payload);
 }
 
-async function tryPasteMermaidText(text) {
+/* Disabled: Native shape conversion for Mermaid doesn't render well
+function convertMermaidSvgToShapes(svgText) {
+  if (typeof svgText !== "string") return false;
+  
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgText, "image/svg+xml");
+  const svgRoot = doc.documentElement;
+  
+  if (!svgRoot || svgRoot.nodeName.toLowerCase() !== "svg") {
+    return false;
+  }
+
+  // Get SVG viewBox or dimensions
+  let viewBox = svgRoot.getAttribute('viewBox');
+  const svgWidthAttr = svgRoot.getAttribute('width');
+  const svgHeightAttr = svgRoot.getAttribute('height');
+  let svgWidth = svgWidthAttr ? parseFloat(svgWidthAttr) : 800;
+  let svgHeight = svgHeightAttr ? parseFloat(svgHeightAttr) : 800;
+  
+  let minX = 0, minY = 0, vbWidth = svgWidth, vbHeight = svgHeight;
+  if (viewBox) {
+    const parts = viewBox.split(/\s+|,/).map(parseFloat);
+    if (parts.length === 4) {
+      [minX, minY, vbWidth, vbHeight] = parts;
+    }
+  }
+
+  // Calculate scale to fit on stage (max 60% of stage size)
+  const stageWidth = state?.stage?.width || 800;
+  const stageHeight = state?.stage?.height || 600;
+  const maxWidth = stageWidth * 0.6;
+  const maxHeight = stageHeight * 0.6;
+  
+  let scale = Math.min(maxWidth / vbWidth, maxHeight / vbHeight, 1);
+  
+  // Center the diagram on stage
+  const scaledWidth = vbWidth * scale;
+  const scaledHeight = vbHeight * scale;
+  const offsetX = (stageWidth - scaledWidth) / 2 - minX * scale;
+  const offsetY = (stageHeight - scaledHeight) / 2 - minY * scale;
+
+  const createdShapes = [];
+  
+  pushHistorySnapshot("paste-mermaid");
+
+  // Helper to get computed or inline style
+  const getStyleValue = (element, property, fallback) => {
+    if (!element) return fallback;
+    const inline = element.getAttribute(property) || element.style.getPropertyValue(property);
+    if (inline && inline !== 'none') return inline;
+    return fallback;
+  };
+
+  // Helper to parse color (handle rgb, rgba, hex)
+  const parseColor = (colorStr) => {
+    if (!colorStr || colorStr === 'none') return null;
+    // Convert rgb/rgba to hex if needed
+    if (colorStr.startsWith('rgb')) {
+      const match = colorStr.match(/\d+/g);
+      if (match && match.length >= 3) {
+        const r = parseInt(match[0]).toString(16).padStart(2, '0');
+        const g = parseInt(match[1]).toString(16).padStart(2, '0');
+        const b = parseInt(match[2]).toString(16).padStart(2, '0');
+        return `#${r}${g}${b}`;
+      }
+    }
+    return colorStr;
+  };
+
+  // Detect diagram type from SVG classes and id
+  const svgClass = svgRoot.getAttribute('class') || '';
+  const svgId = svgRoot.getAttribute('id') || '';
+  const allText = svgRoot.textContent || '';
+  
+  const isSequenceDiagram = svgId.includes('mermaid') && (
+    svgRoot.querySelector('.actor') || 
+    svgRoot.querySelector('[class*="sequenceDiagram"]') ||
+    svgClass.includes('sequence')
+  );
+  const isClassDiagram = svgId.includes('mermaid') && (
+    svgRoot.querySelector('.classGroup') ||
+    svgRoot.querySelector('[class*="classDiagram"]') ||
+    svgClass.includes('class')
+  );
+  const isStateDiagram = svgId.includes('mermaid') && (
+    svgRoot.querySelector('.stateGroup') ||
+    svgRoot.querySelector('[class*="stateDiagram"]') ||
+    svgClass.includes('state')
+  );
+  const isFlowchart = !isSequenceDiagram && !isClassDiagram && !isStateDiagram;
+
+  // Find all nodes - different selectors for different diagram types
+  // Cast to array for easier manipulation
+  let nodes = [];
+  if (isSequenceDiagram) {
+    nodes = Array.from(svgRoot.querySelectorAll('.actor, .note, .activation, rect[class*="actor"]'));
+  } else if (isClassDiagram) {
+    nodes = Array.from(svgRoot.querySelectorAll('.classGroup, [class*="classGroup"], g[id*="class"]'));
+  } else if (isStateDiagram) {
+    nodes = Array.from(svgRoot.querySelectorAll('.stateGroup, .state, [class*="state"], g[id*="state"]'));
+  } else {
+    // Flowchart and other diagrams - look for any group with rect/polygon/circle/ellipse
+    nodes = Array.from(svgRoot.querySelectorAll('.node, [class*="node"], g[id*="flowchart"]'));
+    // Also include standalone shapes that might be nodes
+    if (nodes.length === 0) {
+      const groups = Array.from(svgRoot.querySelectorAll('g'));
+      nodes = groups.filter(g => 
+        g.querySelector('rect') || g.querySelector('polygon') || 
+        g.querySelector('circle') || g.querySelector('ellipse')
+      );
+    }
+  }
+  
+  nodes.forEach(nodeGroup => {
+    // Find shape elements
+    const rect = nodeGroup.querySelector('rect');
+    const circle = nodeGroup.querySelector('circle');
+    const polygon = nodeGroup.querySelector('polygon');
+    const ellipse = nodeGroup.querySelector('ellipse');
+    const textElements = nodeGroup.querySelectorAll('text, .nodeLabel, .label, tspan');
+    
+    let shapeElement = rect || circle || polygon || ellipse;
+    
+    if (shapeElement) {
+      let x, y, width, height, shapeType = 'rectangle';
+      let textContent = '';
+      
+      // Extract text content from all text elements
+      textElements.forEach(textElem => {
+        if (textElem && textElem.textContent) {
+          const content = textElem.textContent.trim();
+          if (content && !textContent.includes(content)) {
+            textContent += (textContent ? ' ' : '') + content;
+          }
+        }
+      });
+      
+      if (rect) {
+        const xAttr = rect.getAttribute('x');
+        const yAttr = rect.getAttribute('y');
+        const widthAttr = rect.getAttribute('width');
+        const heightAttr = rect.getAttribute('height');
+        const rxAttr = rect.getAttribute('rx');
+        const ryAttr = rect.getAttribute('ry');
+        
+        x = xAttr ? parseFloat(xAttr) : 0;
+        y = yAttr ? parseFloat(yAttr) : 0;
+        width = widthAttr ? parseFloat(widthAttr) : 0;
+        height = heightAttr ? parseFloat(heightAttr) : 0;
+        const rx = rxAttr ? parseFloat(rxAttr) : 0;
+        const ry = ryAttr ? parseFloat(ryAttr) : 0;
+        
+        // Check node class to determine if it's a decision/diamond
+        const nodeClass = nodeGroup.getAttribute('class') || '';
+        const nodeId = nodeGroup.getAttribute('id') || '';
+        const nodeLabel = nodeGroup.querySelector('.nodeLabel, .label')?.textContent || '';
+        
+        // Check for decision indicators in class, id, or if shape looks like a diamond
+        const isDiamond = nodeClass.includes('decision') || 
+                         nodeClass.includes('rhombus') || 
+                         nodeId.includes('rhombus') || 
+                         nodeId.includes('decision') ||
+                         nodeClass.includes('type-rhombus') ||
+                         // Also check if it has a curly brace pattern in text (Mermaid decision syntax)
+                         (nodeLabel && nodeLabel.includes('{') && nodeLabel.includes('}'));
+        
+        if (isDiamond) {
+          shapeType = 'diamond';
+        } else if (rx > width * 0.4 || ry > height * 0.4) {
+          // Very rounded corners → ellipse
+          shapeType = 'ellipse';
+        } else {
+          // Default to rectangle
+          shapeType = 'rectangle';
+        }
+      } else if (circle) {
+        const cxAttr = circle.getAttribute('cx');
+        const cyAttr = circle.getAttribute('cy');
+        const rAttr = circle.getAttribute('r');
+        
+        const cx = cxAttr ? parseFloat(cxAttr) : 0;
+        const cy = cyAttr ? parseFloat(cyAttr) : 0;
+        const r = rAttr ? parseFloat(rAttr) : 0;
+        x = cx - r;
+        y = cy - r;
+        width = r * 2;
+        height = r * 2;
+        shapeType = 'ellipse';
+      } else if (ellipse) {
+        const cxAttr = ellipse.getAttribute('cx');
+        const cyAttr = ellipse.getAttribute('cy');
+        const rxAttr = ellipse.getAttribute('rx');
+        const ryAttr = ellipse.getAttribute('ry');
+        
+        const cx = cxAttr ? parseFloat(cxAttr) : 0;
+        const cy = cyAttr ? parseFloat(cyAttr) : 0;
+        const rx = rxAttr ? parseFloat(rxAttr) : 0;
+        const ry = ryAttr ? parseFloat(ryAttr) : 0;
+        x = cx - rx;
+        y = cy - ry;
+        width = rx * 2;
+        height = ry * 2;
+        shapeType = 'ellipse';
+      } else if (polygon) {
+        // Parse polygon points to get bounding box
+        const points = polygon.getAttribute('points') || '';
+        const coords = points.trim().split(/\s+/).map(p => {
+          const [px, py] = p.split(',').map(parseFloat);
+          return { x: px, y: py };
+        });
+        
+        if (coords.length > 0) {
+          const xs = coords.map(c => c.x);
+          const ys = coords.map(c => c.y);
+          x = Math.min(...xs);
+          y = Math.min(...ys);
+          width = Math.max(...xs) - x;
+          height = Math.max(...ys) - y;
+          
+          // Check if it's a diamond (4 points in diamond pattern)
+          if (coords.length === 4) {
+            // Check if points form a diamond pattern (top, right, bottom, left)
+            const centerX = (Math.max(...xs) + Math.min(...xs)) / 2;
+            const centerY = (Math.max(...ys) + Math.min(...ys)) / 2;
+            
+            // Count points that are roughly on the center line (vertical or horizontal)
+            const tolerance = Math.min(width, height) * 0.1;
+            const onVerticalCenter = coords.filter(c => Math.abs(c.x - centerX) < tolerance).length;
+            const onHorizontalCenter = coords.filter(c => Math.abs(c.y - centerY) < tolerance).length;
+            
+            // Diamond has 2 points on vertical center and 2 on horizontal center
+            const isDiamond = onVerticalCenter >= 2 && onHorizontalCenter >= 2;
+            shapeType = isDiamond ? 'diamond' : 'rectangle';
+          } else {
+            shapeType = 'rectangle';
+          }
+        }
+      }
+      
+      if (width > 0 && height > 0) {
+        // Transform coordinates
+        const shapeX = (x * scale) + offsetX;
+        const shapeY = (y * scale) + offsetY;
+        const shapeWidth = width * scale;
+        const shapeHeight = height * scale;
+        
+        // Extract styles from SVG element or its parent
+        const fillColor = parseColor(getStyleValue(shapeElement, 'fill', '#ECECFF'));
+        const strokeColor = parseColor(getStyleValue(shapeElement, 'stroke', '#9370DB'));
+        const strokeWidthAttr = shapeElement.getAttribute('stroke-width') || shapeElement.style.strokeWidth;
+        const strokeWidth = strokeWidthAttr ? parseFloat(strokeWidthAttr) : 2;
+        const opacityAttr = shapeElement.getAttribute('opacity') || shapeElement.style.opacity;
+        const opacity = opacityAttr ? parseFloat(opacityAttr) : 1;
+        
+        // Extract font size from text elements if present
+        let fontSize = 24;
+        if (textElements.length > 0) {
+          const firstText = textElements[0];
+          const fontSizeAttr = firstText.getAttribute('font-size') || firstText.style.fontSize;
+          if (fontSizeAttr) {
+            const parsedSize = parseFloat(fontSizeAttr);
+            if (!isNaN(parsedSize)) {
+              fontSize = Math.max(12, Math.min(32, parsedSize * scale));
+            }
+          } else {
+            // Estimate font size from shape height
+            fontSize = Math.max(14, Math.min(28, shapeHeight * 0.4));
+          }
+        }
+        
+        // Determine if this is a text shape (has text but no significant visual shape)
+        const isTextOnlyShape = textContent && shapeType === 'text';
+        
+        if (isTextOnlyShape) {
+          // Create a text shape with the content
+          const textShape = {
+            id: shapeIdCounter++,
+            type: 'text',
+            style: {
+              fill: parseColor(getStyleValue(textElements[0], 'fill', '#333333')) || '#333333',
+              stroke: 'transparent',
+              strokeWidth: 0,
+              strokeStyle: 'solid',
+              sketchLevel: 0,
+              arrowStart: false,
+              arrowEnd: false,
+              opacity: opacity,
+              fontFamily: state.style.fontFamily || DEFAULT_TEXT_FONT,
+              fontSize: fontSize,
+              rotation: 0,
+              fillStyle: 'solid',
+              edgeStyle: 'round'
+            },
+            live: {
+              x: shapeX + shapeWidth / 2,
+              y: shapeY + shapeHeight / 2,
+              width: Math.max(shapeWidth, textContent.length * fontSize * 0.6),
+              height: fontSize * 1.6 + TEXT_PADDING,
+              rotation: 0,
+              text: textContent,
+              ascent: 0,
+              descent: 0,
+              lineHeight: fontSize * 1.25
+            },
+            keyframes: [],
+            birthTime: state.timeline.current,
+            isVisible: true
+          };
+          
+          updateTextMetrics(textShape);
+          ensureBaseKeyframe(textShape);
+          state.shapes.push(textShape);
+          createdShapes.push(textShape.id);
+        } else {
+          // Create shape with embedded text
+          const shape = {
+            id: shapeIdCounter++,
+            type: shapeType,
+            style: {
+              fill: fillColor || '#ECECFF',
+              stroke: strokeColor || '#9370DB',
+              strokeWidth: Math.max(1, strokeWidth * scale),
+              strokeStyle: 'solid',
+              sketchLevel: 0,
+              arrowStart: false,
+              arrowEnd: false,
+              opacity: opacity,
+              fontFamily: state.style.fontFamily || DEFAULT_TEXT_FONT,
+              fontSize: fontSize,
+              rotation: 0,
+              fillStyle: 'solid',
+              edgeStyle: 'round'
+            },
+            live: {
+              x: shapeX,
+              y: shapeY,
+              width: shapeWidth,
+              height: shapeHeight,
+              rotation: 0
+            },
+            keyframes: [],
+            birthTime: state.timeline.current,
+            isVisible: true
+          };
+          
+          // Add text to the shape if present
+          if (textContent) {
+            shape.live.text = textContent;
+            shape.live.ascent = 0;
+            shape.live.descent = 0;
+            shape.live.lineHeight = fontSize * 1.25;
+            updateTextMetrics(shape);
+          }
+          
+          ensureBaseKeyframe(shape);
+          state.shapes.push(shape);
+          createdShapes.push(shape.id);
+        }
+      }
+    }
+  });
+
+  // Find all edges/links (lines and arrows) - support multiple diagram types
+  let edgeSelector = '.edgePath path, .flowchart-link, [class*="edge"] path, path[class*="link"]';
+  if (isSequenceDiagram) {
+    edgeSelector += ', .messageLine0, .messageLine1, line[class*="message"]';
+  } else if (isClassDiagram) {
+    edgeSelector += ', .relation, line[class*="relation"]';
+  } else if (isStateDiagram) {
+    edgeSelector += ', .transition, path[class*="transition"]';
+  }
+  
+  const edges = svgRoot.querySelectorAll(edgeSelector);
+  
+  edges.forEach(edge => {
+    let start = null, end = null;
+    
+    // Handle <line> elements (common in sequence/class diagrams)
+    if (edge.tagName.toLowerCase() === 'line') {
+      const x1Attr = edge.getAttribute('x1');
+      const y1Attr = edge.getAttribute('y1');
+      const x2Attr = edge.getAttribute('x2');
+      const y2Attr = edge.getAttribute('y2');
+      
+      if (x1Attr && y1Attr && x2Attr && y2Attr) {
+        start = { x: parseFloat(x1Attr), y: parseFloat(y1Attr) };
+        end = { x: parseFloat(x2Attr), y: parseFloat(y2Attr) };
+      }
+    } else {
+      // Handle <path> elements
+      const d = edge.getAttribute('d');
+      if (!d) return;
+      
+      // Parse the path to get start and end points
+      // Handle M (moveto), L (lineto), C (curve) commands
+      const commands = d.match(/[MLCQHVZ][\d\s,.-]+/gi);
+      if (!commands || commands.length < 1) return;
+      
+      const getCoords = (cmd) => {
+        const nums = cmd.slice(1).trim().split(/[\s,]+/).map(parseFloat);
+        if (nums.length >= 2) {
+          return { x: nums[0], y: nums[1] };
+        }
+        return null;
+      };
+      
+      // Get first coordinate from M command
+      start = getCoords(commands[0]);
+      if (!start) return;
+    
+    // Get last coordinate - handle different command types
+    let end = null;
+    for (let i = commands.length - 1; i >= 0; i--) {
+      const cmd = commands[i];
+      const type = cmd[0].toUpperCase();
+      
+      if (type === 'M' || type === 'L') {
+        end = getCoords(cmd);
+        if (end) break;
+      } else if (type === 'C') {
+        // Cubic bezier - last two numbers are end point
+        const nums = cmd.slice(1).trim().split(/[\s,]+/).map(parseFloat);
+        if (nums.length >= 6) {
+          end = { x: nums[4], y: nums[5] };
+          break;
+        }
+      } else if (type === 'Q') {
+        // Quadratic bezier - last two numbers are end point
+        const nums = cmd.slice(1).trim().split(/[\s,]+/).map(parseFloat);
+        if (nums.length >= 4) {
+          end = { x: nums[2], y: nums[3] };
+          break;
+        }
+      }
+    }
+      
+      if (!end) return;
+    }
+    
+    // Skip if we couldn't extract coordinates
+    if (!start || !end) return;
+    
+    const startX = (start.x * scale) + offsetX;
+    const startY = (start.y * scale) + offsetY;
+    const endX = (end.x * scale) + offsetX;
+    const endY = (end.y * scale) + offsetY;
+    
+    // Extract stroke styling
+    const strokeColor = parseColor(getStyleValue(edge, 'stroke', '#333333'));
+    const strokeWidthAttr = edge.getAttribute('stroke-width') || edge.style.strokeWidth;
+    const strokeWidth = strokeWidthAttr ? parseFloat(strokeWidthAttr) : 1.5;
+    const strokeDasharray = edge.getAttribute('stroke-dasharray') || edge.style.strokeDasharray;
+    const opacityAttr = edge.getAttribute('opacity') || edge.style.opacity;
+    const opacity = opacityAttr ? parseFloat(opacityAttr) : 1;
+    
+    // Check for arrows
+    const markerEnd = edge.getAttribute('marker-end') || '';
+    const markerStart = edge.getAttribute('marker-start') || '';
+    const hasArrowEnd = markerEnd.includes('arrow') || markerEnd.includes('arrowhead');
+    const hasArrowStart = markerStart.includes('arrow') || markerStart.includes('arrowhead');
+    
+    // Determine stroke style
+    let strokeStyle = 'solid';
+    if (strokeDasharray && strokeDasharray !== 'none') {
+      const dashValues = strokeDasharray.split(/[\s,]+/).map(parseFloat);
+      // If dashes are roughly equal, it's dashed, otherwise dotted
+      if (dashValues.length >= 2 && Math.abs(dashValues[0] - dashValues[1]) < 2) {
+        strokeStyle = 'dashed';
+      } else {
+        strokeStyle = 'dotted';
+      }
+    }
+    
+    const lineShape = {
+      id: shapeIdCounter++,
+      type: hasArrowEnd || hasArrowStart ? 'arrow' : 'line',
+      style: {
+        fill: 'transparent',
+        stroke: strokeColor || '#333333',
+        strokeWidth: Math.max(1, strokeWidth * scale),
+        strokeStyle: strokeStyle,
+        sketchLevel: 0,
+        arrowStart: hasArrowStart,
+        arrowEnd: hasArrowEnd,
+        opacity: opacity,
+        fontFamily: state.style.fontFamily || DEFAULT_TEXT_FONT,
+        fontSize: 24,
+        rotation: 0
+      },
+      live: {
+        start: { x: startX, y: startY },
+        end: { x: endX, y: endY }
+      },
+      keyframes: [],
+      birthTime: state.timeline.current,
+      isVisible: true
+    };
+    
+    ensureBaseKeyframe(lineShape);
+    state.shapes.push(lineShape);
+    createdShapes.push(lineShape.id);
+  });
+
+  if (createdShapes.length > 0) {
+    // Select all created shapes
+    updateSelection(createdShapes);
+    render();
+    return true;
+  }
+  
+  // Fallback to image if no shapes were created
+  const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
+  const dataUrl = URL.createObjectURL(svgBlob);
+  createImageShapeFromSourceInternal(dataUrl);
+  return true;
+}
+*/
+
+async function tryPasteMermaidText(text, options = {}) {
   if (typeof text !== "string") return false;
   const trimmed = text.trim();
   if (!trimmed) return false;
@@ -5290,7 +5814,7 @@ async function tryPasteMermaidText(text) {
     
     if (!svg) return false;
 
-    // Convert SVG to data URL and create as image shape (not fragmented SVG)
+    // Always convert SVG to data URL and create as single image shape
     const svgBlob = new Blob([svg], { type: 'image/svg+xml' });
     
     // Convert to data URL using Promise-based approach
@@ -5759,7 +6283,7 @@ function resolveExcalidrawFontFamily(value) {
   }
 }
 
-function tryPasteGraphicsFromClipboard(clipboardData) {
+function tryPasteGraphicsFromClipboard(clipboardData, event = null) {
   if (!clipboardData) return false;
 
   const acceptImageFile = (file) => {
@@ -5992,12 +6516,110 @@ function handleGlobalPaste(event) {
   if (event.defaultPrevented) return;
   if (isTextInputActive()) return;
   const clipboardData = event.clipboardData || window.clipboardData || null;
-  if (clipboardData && tryPasteGraphicsFromClipboard(clipboardData)) {
+  if (clipboardData && tryPasteGraphicsFromClipboard(clipboardData, event)) {
     event.preventDefault();
     return;
   }
   if (pasteClipboardItems()) {
     event.preventDefault();
+  }
+}
+
+async function triggerPasteFromClipboard() {
+  // First check if we have items in internal clipboard (from copy/cut operations)
+  const clipboard = ensureClipboardState();
+  if (clipboard.items && clipboard.items.length > 0) {
+    if (pasteClipboardItems()) {
+      render();
+      return;
+    }
+  }
+
+  // Try to read from clipboard API
+  try {
+    if (navigator.clipboard && navigator.clipboard.read) {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        // Try image types first
+        for (const type of item.types) {
+          if (type.startsWith('image/')) {
+            const blob = await item.getType(type);
+            const dataUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            createImageShapeFromSourceInternal(dataUrl);
+            render();
+            return;
+          }
+        }
+        
+        // Try text types
+        if (item.types.includes('text/plain')) {
+          const blob = await item.getType('text/plain');
+          const text = await blob.text();
+          
+          // Try Mermaid first
+          if (await tryPasteMermaidText(text)) {
+            return;
+          }
+          
+          // Try other graphics formats
+          const trimmed = text.trim();
+          if (trimmed.startsWith("data:image")) {
+            createImageShapeFromSourceInternal(trimmed);
+            render();
+            return;
+          }
+          
+          // Try Excalidraw format
+          if (tryPasteExcalidrawText(text)) {
+            render();
+            return;
+          }
+          
+          // Try internal clipboard format
+          if (pasteClipboardItems()) {
+            render();
+            return;
+          }
+        }
+      }
+    } else if (navigator.clipboard && navigator.clipboard.readText) {
+      // Fallback to readText
+      const text = await navigator.clipboard.readText();
+      
+      // Try Mermaid first
+      if (await tryPasteMermaidText(text)) {
+        return;
+      }
+      
+      // Try other formats
+      const trimmed = text.trim();
+      if (trimmed.startsWith("data:image")) {
+        createImageShapeFromSourceInternal(trimmed);
+        render();
+        return;
+      }
+      
+      if (tryPasteExcalidrawText(text)) {
+        render();
+        return;
+      }
+      
+      if (pasteClipboardItems()) {
+        render();
+        return;
+      }
+    }
+  } catch (error) {
+    console.warn('Clipboard read failed:', error);
+    // Fallback: try internal clipboard
+    if (pasteClipboardItems()) {
+      render();
+    }
   }
 }
 
