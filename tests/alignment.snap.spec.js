@@ -5,14 +5,14 @@ test.describe("Alignment snapping", () => {
   test("shapes snap to alignment when CTRL is held during move", async ({ page }) => {
     await loadApp(page);
 
-    // Draw reference rectangle at x=150, y=150
+    // Draw reference rectangle
     await page.click('[data-tool="rectangle"]');
     const canvas = page.locator("canvas");
     const canvasBox = await canvas.boundingBox();
     
-    await drawRectangle(page, canvas, {
-      offsetX: canvasBox.x + 150,
-      offsetY: canvasBox.y + 150,
+    await drawRectangle(page, {
+      offsetX: -200,
+      offsetY: -100,
       width: 100,
       height: 80
     });
@@ -23,11 +23,11 @@ test.describe("Alignment snapping", () => {
     // Wait a moment for deselection
     await page.waitForTimeout(50);
 
-    // Draw second rectangle offset by 7 pixels (within snap threshold)
+    // Draw second rectangle offset by 7 pixels in Y (within snap threshold)
     await page.click('[data-tool="rectangle"]');
-    await drawRectangle(page, canvas, {
-      offsetX: canvasBox.x + 300,
-      offsetY: canvasBox.y + 157, // 7 pixels different from first rectangle
+    await drawRectangle(page, {
+      offsetX: 50,
+      offsetY: -93, // 7 pixels different from first rectangle's Y
       width: 100,
       height: 80
     });
@@ -42,17 +42,26 @@ test.describe("Alignment snapping", () => {
       return { x: shape.live.x, y: shape.live.y };
     });
 
+    // Switch to select tool
+    await page.click('[data-tool="select"]');
+
     // Select the second shape
     const shape2Center = {
       x: canvasBox.x + beforeMove.x + 50,
       y: canvasBox.y + beforeMove.y + 40
     };
     await page.mouse.click(shape2Center.x, shape2Center.y);
+    
+    // Wait for selection to complete
+    await page.waitForTimeout(100);
 
-    // Hold CTRL and drag shape slightly (not enough to exit snap threshold)
-    await page.keyboard.down("Control");
+    // Start dragging WITHOUT CTRL
     await page.mouse.move(shape2Center.x, shape2Center.y);
     await page.mouse.down();
+    
+    // NOW hold CTRL to activate alignment guides during drag
+    await page.keyboard.down("Control");
+    await page.waitForTimeout(50);
     
     // Move just 2 pixels - should snap to alignment
     await page.mouse.move(shape2Center.x - 2, shape2Center.y - 2, { steps: 5 });
@@ -82,8 +91,11 @@ test.describe("Alignment snapping", () => {
     console.log("Before:", beforeMove, "After:", afterMove);
 
     // The Y position should have snapped to align with first rectangle
-    // Due to snapping, the shapes should now be perfectly aligned
-    expect(Math.abs(afterMove.y - 150)).toBeLessThan(3); // Allow small tolerance for test timing
+    // Get the first shape's Y position to compare
+    const firstY = await page.evaluate(() => window.animatorState.shapes[0].live.y);
+    
+    // Due to snapping, the shapes should now be aligned (within tolerance)
+    expect(Math.abs(afterMove.y - firstY)).toBeLessThan(3); // Allow small tolerance for test timing
   });
 
   test("alignment guides appear during resize with CTRL", async ({ page }) => {
