@@ -4,25 +4,39 @@ name: Trigger auto deployment for animatorstudio
 on:
   # Automatically trigger it when detected changes in repo
   push:
-    branches: 
-      [ main ]
+    branches: [main]
     paths:
-    - '**'
-    - '.github/workflows/animatorstudio-AutoDeployTrigger-3b7a13d0-5f66-4e12-b621-89910c5cd570.yml'
+      - "**"
+      - ".github/workflows/animatorstudio-AutoDeployTrigger-3b7a13d0-5f66-4e12-b621-89910c5cd570.yml"
 
-  # Allow manual trigger 
-  workflow_dispatch:      
+  # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    permissions: 
+    permissions:
       id-token: write #This is required for requesting the OIDC JWT Token
       contents: read #Required when GH token is used to authenticate with private repo
 
     steps:
       - name: Checkout to the branch
         uses: actions/checkout@v2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run tests
+        run: npm test
 
       - name: Azure Login
         uses: azure/login@v2
@@ -45,5 +59,3 @@ jobs:
           imageToBuild: jdcontainerregistrynortheurope.azurecr.io/animatorstudio:${{ github.sha }}
           _buildArgumentsKey_: |
             _buildArgumentsValues_
-
-
