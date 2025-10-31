@@ -22,8 +22,15 @@ const TIPS_CONTENT = [
     id: "move-resize",
     text: "With a shape selected, drag to move or pull the corner handle to resize.",
   },
+  { id: "rotate-shapes", text: "Use the blue rotation handle above shapes to rotate them." },
   { id: "timeline", text: "Use the timeline to set keyframes for smooth animations." },
+  { id: "keyframe-drag", text: "Drag keyframe markers on the timeline to adjust animation timing." },
   { id: "arrow-tool", text: "Arrow tool can draw connectors with customizable endings." },
+  { id: "zoom-controls", text: "Use Ctrl + mouse wheel or zoom buttons to zoom in/out on the canvas." },
+  { id: "background-grid", text: "Right-click the canvas and enable background grid for precise alignment." },
+  { id: "svg-paste", text: "Paste SVG code to import vector graphics onto the canvas." },
+  { id: "png-paste", text: "Paste PNG images from clipboard to add photos and raster graphics." },
+  { id: "group-shapes", text: "Select multiple shapes and use Group to move them together." },
 ];
 
 const DEFAULT_STAGE_BACKGROUND =
@@ -71,6 +78,7 @@ const elements = {
   playToggle: document.getElementById("playToggle"),
   stopPlayback: document.getElementById("stopPlayback"),
   addKeyframe: document.getElementById("addKeyframe"),
+  deleteKeyframe: document.getElementById("deleteKeyframe"),
   loopToggle: document.getElementById("loopToggle"),
   bounceToggle: document.getElementById("bounceToggle"),
   bounceToggleLabel: document.getElementById("bounceToggleLabel"),
@@ -86,6 +94,7 @@ const elements = {
   ungroupShapes: document.getElementById("ungroupShapes"),
   deleteShape: document.getElementById("deleteShape"),
   stageBackgroundColor: document.getElementById("stageBackgroundColor"),
+  backgroundGrid: document.getElementById("backgroundGrid"),
   shapeContextMenu: document.getElementById("shapeContextMenu"),
   stageContextMenu: document.getElementById("stageContextMenu"),
   tipsPanel: document.querySelector("[data-tips]"),
@@ -95,6 +104,9 @@ const elements = {
   stageDimensions: document.getElementById("stageDimensions"),
   stageResizeHandle: document.getElementById("stageResizeHandle"),
   stageResizeHandles: Array.from(document.querySelectorAll("[data-stage-resize]")),
+  zoomIn: document.getElementById("zoomIn"),
+  zoomOut: document.getElementById("zoomOut"),
+  zoomReset: document.getElementById("zoomReset"),
   appShell: document.querySelector(".app-shell"),
   toolbarToggles: Array.from(document.querySelectorAll("[data-toolbar-toggle]")),
   toolbar: document.querySelector(".toolbar"),
@@ -271,6 +283,8 @@ const state = {
     resizeSession: null,
     background: DEFAULT_STAGE_BACKGROUND,
     canvasRect: null,
+    zoom: 1,
+    showGrid: false,
   },
   timeline: {
     duration: Number(elements.timelineDuration.value) || TIMELINE_DEFAULT_DURATION,
@@ -801,10 +815,56 @@ function init() {
   restoreStageBackground();
   updateSelection(null);
   setTimelineTime(0, { apply: true });
+  initializeMobileOptimizations();
   window.animatorState = state;
   window.animatorApi = createAnimatorApi();
   window.animatorReady = true;
   render();
+}
+
+function initializeMobileOptimizations() {
+  // Prevent double-tap zoom on buttons and controls
+  const preventDoubleTapZoom = (event) => {
+    const target = event.target.closest('button, .tool-button, .timeline-key, .keyframe-chip');
+    if (target) {
+      event.preventDefault();
+      target.click();
+    }
+  };
+
+  // Add touch-action to prevent default behaviors
+  document.body.style.touchAction = 'pan-x pan-y';
+  
+  // Prevent context menu on long press (mobile)
+  if ('ontouchstart' in window) {
+    document.addEventListener('contextmenu', (event) => {
+      if (event.target.closest('.tool-button, button, .timeline-key')) {
+        event.preventDefault();
+      }
+    });
+  }
+
+  // Handle orientation changes
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      resizeCanvas();
+      updateCanvasMetrics();
+      render();
+    }, 100);
+  });
+
+  // Handle window resize for mobile keyboard
+  let lastHeight = window.innerHeight;
+  window.addEventListener('resize', () => {
+    const currentHeight = window.innerHeight;
+    // If height decreased significantly, keyboard might be showing
+    if (lastHeight - currentHeight > 150) {
+      document.body.classList.add('keyboard-visible');
+    } else {
+      document.body.classList.remove('keyboard-visible');
+    }
+    lastHeight = currentHeight;
+  });
 }
 
 function computeAutoFitSize() {
@@ -889,6 +949,8 @@ function resizeCanvas() {
 
   updateStageDimensionsLabel();
   repositionActiveTextEditor();
+  applyZoom();
+  updateZoomDisplay();
 }
 
 function bindEvents() {
@@ -907,6 +969,11 @@ function bindEvents() {
       return;
     }
     applyStageBackground(value, { updateControl: false });
+  });
+
+  elements.backgroundGrid?.addEventListener("change", (event) => {
+    state.stage.showGrid = event.target.checked;
+    render();
   });
 
   elements.stageContextMenu?.addEventListener("click", (event) => {
@@ -1141,6 +1208,38 @@ function bindEvents() {
     renderKeyframeList();
   });
 
+  elements.deleteKeyframe.addEventListener("click", () => {
+    const targets = getSelectedShapesList();
+    if (targets.length === 0) return;
+    targets.forEach((shape) => {
+      deleteKeyframe(shape, state.timeline.current);
+    });
+    renderKeyframeList();
+    renderTimelineTrackMarkers();
+    render();
+  });
+
+  elements.zoomIn?.addEventListener("click", () => {
+    setZoomLevel(state.stage.zoom * 1.2);
+  });
+
+  elements.zoomOut?.addEventListener("click", () => {
+    setZoomLevel(state.stage.zoom / 1.2);
+  });
+
+  elements.zoomReset?.addEventListener("click", () => {
+    setZoomLevel(1);
+  });
+
+  canvas.addEventListener("wheel", (event) => {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      const delta = -event.deltaY;
+      const zoomFactor = delta > 0 ? 1.1 : 0.9;
+      setZoomLevel(state.stage.zoom * zoomFactor);
+    }
+  }, { passive: false });
+
   const closeExportMenu = () => {
     if (elements.exportMenu?.open) {
       elements.exportMenu.open = false;
@@ -1247,6 +1346,9 @@ function render() {
 
   ctx.save();
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  if (state.stage.showGrid) {
+    drawBackgroundGrid(ctx);
+  }
   drawShapes(ctx);
   drawSelectionBounds(ctx);
   ctx.restore();
@@ -1256,6 +1358,35 @@ function render() {
   }
 
   requestAnimationFrame(render);
+}
+
+function drawBackgroundGrid(context) {
+  const gridSize = 20;
+  const width = state.stage.width;
+  const height = state.stage.height;
+  
+  context.save();
+  context.strokeStyle = "rgba(0, 0, 0, 0.1)";
+  context.lineWidth = 1;
+  context.setLineDash([]);
+  
+  // Draw vertical lines
+  for (let x = 0; x <= width; x += gridSize) {
+    context.beginPath();
+    context.moveTo(x, 0);
+    context.lineTo(x, height);
+    context.stroke();
+  }
+  
+  // Draw horizontal lines
+  for (let y = 0; y <= height; y += gridSize) {
+    context.beginPath();
+    context.moveTo(0, y);
+    context.lineTo(width, y);
+    context.stroke();
+  }
+  
+  context.restore();
 }
 
 function drawShapes(context) {
@@ -2364,6 +2495,7 @@ function handlePointerDown(event) {
       state.pointer.startRotation = getShapeRotation(shape);
       state.pointer.startBounds = rotateHandle.bounds;
       state.pointer.activeHandle = rotateHandle;
+      updateCanvasCursor();
       prepareHistory("rotate-shape");
       return;
     }
@@ -2384,6 +2516,7 @@ function handlePointerDown(event) {
     state.pointer.mode = "moving";
     state.pointer.startSnapshot = cloneSnapshot(shape.live);
     state.pointer.startCenter = getShapeCenter(shape);
+    updateCanvasCursor();
     if (state.selectedIds.size > 1) {
       captureMultiSelectionSnapshot();
     }
@@ -2410,6 +2543,22 @@ function handlePointerDown(event) {
   state.pointer.tempShape = tempShape;
   state.shapes.push(tempShape);
   updateSelection(tempShape);
+}
+
+function updateCanvasCursor() {
+  if (!canvas) return;
+  
+  switch (state.pointer.mode) {
+    case "rotating":
+      canvas.style.cursor = "grabbing";
+      break;
+    case "moving":
+      canvas.style.cursor = "move";
+      break;
+    default:
+      canvas.style.cursor = "";
+      break;
+  }
 }
 
 function handlePointerMove(event) {
@@ -2499,6 +2648,7 @@ function resetPointerInteraction() {
   state.pointer.multiStyles = null;
   state.pointer.marquee = null;
   state.pointer.marqueeAppend = false;
+  updateCanvasCursor();
   state.pointer.usingPointerEvents = false;
   state.pointer.touchIdentifier = null;
   hideMarqueeOverlay();
@@ -3473,22 +3623,29 @@ function getRotationHandlePosition(shape) {
   if (!shape) return null;
   const center = getShapeCenter(shape);
   if (!center) return null;
+  const offset = 5;
 
   if (shape.type === "rectangle" || shape.type === "diamond" || shape.type === "square" || shape.type === "circle" || shape.type === "text" || shape.type === "image") {
+    const bounds = { x: shape.live.x, y: shape.live.y, width: shape.live.width, height: shape.live.height };
+    const anchor = { x: center.x, y: bounds.y };
+    const position = { x: anchor.x, y: anchor.y - offset };
     return {
-      position: center,
-      anchor: null,
+      position,
+      anchor,
       center,
-      bounds: { x: shape.live.x, y: shape.live.y, width: shape.live.width, height: shape.live.height },
+      bounds,
     };
   }
 
   if (shape.type === "line" || shape.type === "arrow") {
+    const bounds = getShapeBounds(shape);
+    const anchor = { x: center.x, y: bounds.y };
+    const position = { x: anchor.x, y: anchor.y - offset };
     return {
-      position: center,
-      anchor: null,
+      position,
+      anchor,
       center,
-      bounds: getShapeBounds(shape),
+      bounds,
     };
   }
 
@@ -4194,6 +4351,12 @@ function refreshSelectionUI() {
   }
   if (elements.addKeyframe) {
     elements.addKeyframe.disabled = selectionSize === 0;
+  }
+  if (elements.deleteKeyframe) {
+    const hasKeyframeAtCurrentTime = selectionSize > 0 && getSelectedShapesList().some(shape => 
+      shape.keyframes && shape.keyframes.some(kf => Math.abs(kf.time - state.timeline.current) < 0.001)
+    );
+    elements.deleteKeyframe.disabled = !hasKeyframeAtCurrentTime;
   }
 
   if (elements.groupShapes) {
@@ -5545,7 +5708,7 @@ function resolveExcalidrawFontFamily(value) {
   }
 }
 
-function maybePasteGraphicsFromClipboard(clipboardData) {
+function tryPasteGraphicsFromClipboard(clipboardData) {
   if (!clipboardData) return false;
 
   const acceptImageFile = (file) => {
@@ -5764,7 +5927,7 @@ function handleGlobalPaste(event) {
   if (event.defaultPrevented) return;
   if (isTextInputActive()) return;
   const clipboardData = event.clipboardData || window.clipboardData || null;
-  if (clipboardData && maybePasteGraphicsFromClipboard(clipboardData)) {
+  if (clipboardData && tryPasteGraphicsFromClipboard(clipboardData)) {
     event.preventDefault();
     return;
   }
@@ -6072,7 +6235,16 @@ function renderTimelineTrackMarkers() {
     ? state.timeline.selectedKeyframeShapeId
     : null;
 
-  state.shapes.forEach((shape) => {
+  // Get selected shapes from canvas selection
+  const selectedShapes = getSelectedShapesList();
+  const hasCanvasSelection = selectedShapes.length > 0;
+
+  // Filter shapes: if shapes are selected on canvas, only show their keyframes
+  const shapesToShow = hasCanvasSelection 
+    ? state.shapes.filter(shape => selectedShapes.some(selected => selected.id === shape.id))
+    : state.shapes;
+
+  shapesToShow.forEach((shape) => {
     if (!shape || !Array.isArray(shape.keyframes)) return;
     shape.keyframes.forEach((keyframe) => {
       if (!keyframe) return;
@@ -6536,6 +6708,7 @@ function setTimelineTime(time, { apply = false } = {}) {
   if (apply) {
     applyTimelineState();
   }
+  refreshSelectionUI();
 }
 
 function applyTimelineDuration(value) {
@@ -6900,6 +7073,29 @@ function persistDismissedTips() {
   }
 }
 
+function setZoomLevel(zoom) {
+  const clamped = Math.max(0.1, Math.min(5, zoom));
+  state.stage.zoom = clamped;
+  applyZoom();
+  updateZoomDisplay();
+}
+
+function applyZoom() {
+  if (!elements.stageSurface) return;
+  const zoom = state.stage.zoom;
+  canvas.style.transform = `scale(${zoom})`;
+  canvas.style.transformOrigin = "center center";
+}
+
+function updateZoomDisplay() {
+  if (!elements.zoomReset) return;
+  const percentage = Math.round(state.stage.zoom * 100);
+  const zoomLevel = elements.zoomReset.querySelector(".zoom-level");
+  if (zoomLevel) {
+    zoomLevel.textContent = `${percentage}%`;
+  }
+}
+
 function applyStageSize(width, height, { persist = true } = {}) {
   if (!canvas) return;
   const minWidth = state.stage.minWidth || 320;
@@ -7218,10 +7414,10 @@ function createSeededRandom(value) {
 }
 
 function drawSketchStroke(context, buildPath, shape, level) {
-  const passes = level === 1 ? 2 : 3;
-  let jitter = level === 1 ? 0.8 : 1.6;
+  const passes = level === 1 ? 2 : 5;
+  let jitter = level === 1 ? 1.2 : 3.5;
   if (shape?.type === "line" || shape?.type === "arrow") {
-    jitter = level === 1 ? 0.35 : 0.75;
+    jitter = level === 1 ? 0.6 : 1.8;
   }
   const random = createSeededRandom(`${shape.id}:${level}`);
   for (let i = 0; i < passes; i += 1) {

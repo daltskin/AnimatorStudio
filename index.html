@@ -2,7 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>Animator Studio</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -336,6 +340,25 @@
             <div class="stage-surface">
               <canvas id="stage" width="1280" height="720" role="application" aria-label="Animation canvas"></canvas>
               <div id="stageDimensions" class="stage-dimensions" aria-live="polite">1280 × 720 px</div>
+              <div class="zoom-controls">
+                <button type="button" id="zoomIn" class="zoom-button" aria-label="Zoom in" title="Zoom in (Ctrl + Mouse wheel up)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+                    <path d="M8 11h6M11 8v6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    <path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" id="zoomOut" class="zoom-button" aria-label="Zoom out" title="Zoom out (Ctrl + Mouse wheel down)">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+                    <path d="M8 11h6" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    <path d="M16.5 16.5L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                </button>
+                <button type="button" id="zoomReset" class="zoom-button zoom-reset" aria-label="Reset zoom" title="Reset zoom to 100%">
+                  <span class="zoom-level">100%</span>
+                </button>
+              </div>
               <button type="button" id="stageResizeHandle" class="stage-resize-handle stage-resize-handle--corner" data-stage-resize="corner" aria-label="Resize canvas" title="Drag to resize the canvas">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                   <path d="M8 16l8-8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
@@ -364,6 +387,7 @@
                 <button id="playToggle" class="primary" title="Play or pause the animation">Play</button>
                 <button id="stopPlayback" class="ghost" title="Stop playback and reset">Stop</button>
                 <button id="addKeyframe" class="ghost" disabled title="Add a keyframe at the current time">Add keyframe</button>
+                <button id="deleteKeyframe" class="ghost" disabled title="Delete keyframe at the current time">Delete keyframe</button>
               </div>
               <div class="timeline-info">
                 <label class="control compact">
@@ -410,6 +434,10 @@
         <input type="color" id="stageBackgroundColor" value="#ffffff" aria-label="Pick stage background colour" />
       </div>
       <button type="button" data-stage-action="reset-background" role="menuitem">Reset background colour</button>
+      <label class="toggle-checkbox context-menu__toggle">
+        <input type="checkbox" id="backgroundGrid" title="Show background grid" />
+        <span class="toggle-checkbox__state">Background grid</span>
+      </label>
     </div>
 
     <div id="shapeContextMenu" class="context-menu" role="menu" hidden aria-hidden="true">
