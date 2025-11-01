@@ -31,6 +31,7 @@ const TIPS_CONTENT = [
   { id: "svg-paste", text: "Paste SVG code to import vector graphics onto the canvas." },
   { id: "png-paste", text: "Paste PNG images from clipboard to add photos and raster graphics." },
   { id: "mermaid-paste", text: "Paste Mermaid diagram syntax (flowcharts, sequence diagrams, etc.) to create image shapes." },
+  { id: "sysml-paste", text: "Paste SysML v2 diagram syntax to create system modeling diagrams as image shapes." },
   { id: "group-shapes", text: "Select multiple shapes and use Group to move them together." },
 ];
 
@@ -6036,6 +6037,230 @@ async function tryPasteMermaidText(text, options = {}) {
   }
 }
 
+async function tryPasteSysMLText(text, options = {}) {
+  if (typeof text !== "string") return false;
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+
+  // Detect SysML v2 keywords and syntax patterns
+  const sysmlKeywords = [
+    'package', 'part def', 'part', 'attribute def', 'attribute',
+    'port def', 'port', 'connection def', 'connection',
+    'item def', 'item', 'action def', 'action',
+    'state def', 'state', 'requirement def', 'requirement',
+    'use case def', 'use case', 'interface def', 'interface',
+    'allocation def', 'allocation', 'constraint def', 'constraint',
+    'binding def', 'binding', 'verify', 'satisfy'
+  ];
+  
+  // Check for SysML v2 syntax patterns
+  const lowerText = trimmed.toLowerCase();
+  const hasSysMLKeyword = sysmlKeywords.some(keyword => lowerText.includes(keyword));
+  
+  // Also check for SysML v2-specific syntax patterns
+  const hasSysMLPattern = /\b(part def|attribute def|port def|connection def|item def|action def|state def|requirement def|use case def|interface def|allocation def|constraint def|binding def)\b/i.test(trimmed);
+  
+  // Check for block structure typical of SysML v2
+  const hasBlockStructure = /^\s*(package|part|attribute|port|connection|item|action|state|requirement)\s+\w+/im.test(trimmed);
+  
+  if (!hasSysMLKeyword && !hasSysMLPattern && !hasBlockStructure) return false;
+
+  // Check if mermaid library is loaded
+  if (typeof window.mermaid === 'undefined') {
+    console.warn('Mermaid library not loaded - required for SysML v2 rendering');
+    return false;
+  }
+
+  try {
+    // Convert SysML v2 textual syntax to Mermaid class diagram format
+    const mermaidContent = convertSysMLToMermaid(trimmed);
+    
+    // Generate a unique ID for the diagram
+    const diagramId = `sysml-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Render the SysML diagram to SVG using Mermaid
+    const { svg } = await window.mermaid.render(diagramId, mermaidContent);
+    
+    if (!svg) return false;
+
+    // Convert SVG to data URL and create as single image shape
+    const svgBlob = new Blob([svg], { type: 'image/svg+xml' });
+    
+    // Convert to data URL using Promise-based approach
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(svgBlob);
+    });
+    
+    createImageShapeFromSourceInternal(dataUrl);
+    return true;
+  } catch (error) {
+    console.error('Failed to render SysML v2 diagram:', error);
+    return false;
+  }
+}
+
+function convertSysMLToMermaid(sysmlText) {
+  // Simple converter from SysML v2 to Mermaid class diagram syntax
+  // This is a basic implementation that handles common SysML v2 constructs
+  
+  let mermaid = 'classDiagram\n';
+  const lines = sysmlText.split('\n');
+  const classes = [];
+  const relationships = [];
+  let currentClass = null;
+  let braceDepth = 0;
+  
+  for (let line of lines) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine || trimmedLine.startsWith('//') || trimmedLine.startsWith('/*')) {
+      continue;
+    }
+    
+    // Count braces to track nesting
+    const openBraces = (trimmedLine.match(/{/g) || []).length;
+    const closeBraces = (trimmedLine.match(/}/g) || []).length;
+    
+    // Match part def, requirement def, constraint def, binding def, etc. - supports quoted strings and IDs in angle brackets
+    const defMatch = trimmedLine.match(/^(part|requirement|action|state|item|interface|package|use case|attribute|port|connection|allocation|constraint|binding)\s+def\s+(?:<['"]?[^'>]+['"]?>\s+)?['"]?([^'"{\s;:>]+(?:\s+[^'"{\s;:>]+)*)['"]?/i) ||
+                     trimmedLine.match(/^(use case)\s+['"]?(\w+)['"]?\s*:\s*['"]?([^'"{\s;:>]+(?:\s+[^'"{\s;:>]+)*)['"]?/i) ||
+                     trimmedLine.match(/^(requirement)\s+(?:<['"]?[^'>]+['"]?>\s+)?['"]?(\w+)['"]?\s*:\s*['"]?([^'"{\s;:>]+(?:\s+[^'"{\s;:>]+)*)['"]?/i);
+    if (defMatch) {
+      const className = (defMatch[2] || defMatch[3] || 'Unknown').replace(/['"]/g, '').replace(/\s+/g, '_');
+      const classType = defMatch[1];
+      
+      if (braceDepth === 0 || !currentClass) {
+        // Top-level definition
+        currentClass = { name: className, type: classType, members: [] };
+        classes.push(currentClass);
+      } else if (currentClass && braceDepth > 0) {
+        // Nested definition - create new class and add relationship
+        const nestedClass = { name: className, type: classType, members: [] };
+        classes.push(nestedClass);
+        relationships.push({ from: currentClass.name, to: className, label: 'contains' });
+        currentClass = nestedClass;
+      }
+      
+      braceDepth += openBraces;
+      braceDepth -= closeBraces;
+      continue;
+    }
+    
+    // Match simple declarations like "part engine : Engine" or with quoted names
+    const partMatch = trimmedLine.match(/^(part|attribute|port|item|action)\s+['"]?(\w+)['"]?\s*:\s*['"]?(\w+)['"]?(\[.*\])?/i);
+    if (partMatch && currentClass && braceDepth > 0) {
+      const [, type, name, refType, multiplicity] = partMatch;
+      currentClass.members.push(`+${name} : ${refType}${multiplicity || ''}`);
+      
+      // Add composition relationship
+      relationships.push({ from: currentClass.name, to: refType, label: 'contains', type: 'composition' });
+      
+      braceDepth += openBraces;
+      braceDepth -= closeBraces;
+      continue;
+    }
+    
+    // Match attribute declarations like "attribute mass : Real" or with specialization (:>) or redefinition (:>>)
+    const attrMatch = trimmedLine.match(/^attribute\s+(?::>>)?\s*['"]?(\w+)['"]?\s*:\s*['"]?(\w+)['"]?(?:\s*:>>?\s*[^;={\s]+)?(?:\s*=\s*[^;]+)?/i);
+    if (attrMatch && currentClass && braceDepth > 0) {
+      currentClass.members.push(`+${attrMatch[1]} : ${attrMatch[2]}`);
+      
+      braceDepth += openBraces;
+      braceDepth -= closeBraces;
+      continue;
+    }
+    
+    // Match package declaration - supports quoted strings and :: namespace separators
+    const packageMatch = trimmedLine.match(/^package\s+['"]?([^'"{\s]+(?:::[^'"{\s]+)*(?:\s+[^'"{\s]+)*)['"]?/i);
+    if (packageMatch && braceDepth === 0) {
+      const packageName = packageMatch[1].replace(/['"]/g, '').replace(/\s+/g, '_').replace(/::/g, '_');
+      currentClass = { name: packageName, type: 'package', members: [] };
+      classes.push(currentClass);
+      
+      braceDepth += openBraces;
+      braceDepth -= closeBraces;
+      continue;
+    }
+    
+    // Match use case subject/actor declarations
+    const subjectMatch = trimmedLine.match(/^(subject|actor)\s+['"]?(\w+)['"]?\s*:\s*['"]?(\w+)['"]?(\[.*\])?/i);
+    if (subjectMatch && currentClass && braceDepth > 0) {
+      const [, role, name, type, multiplicity] = subjectMatch;
+      currentClass.members.push(`+${name} : ${type}${multiplicity || ''}`);
+      
+      braceDepth += openBraces;
+      braceDepth -= closeBraces;
+      continue;
+    }
+    
+    // Match param/result declarations (constraint parameters)
+    const paramMatch = trimmedLine.match(/^(param|result)\s+(\w+)\s*:\s*(\w+)(?:\s*=\s*[^;]+)?/i);
+    if (paramMatch && currentClass && braceDepth > 0) {
+      const [, kind, name, type] = paramMatch;
+      currentClass.members.push(`+${name} : ${type}`);
+      
+      braceDepth += openBraces;
+      braceDepth -= closeBraces;
+      continue;
+    }
+    
+    // Match connection statements
+    const connectionMatch = trimmedLine.match(/connect\s+(\w+).*to\s+(\w+)/i);
+    if (connectionMatch) {
+      relationships.push({ from: connectionMatch[1], to: connectionMatch[2], label: 'connects' });
+      
+      braceDepth += openBraces;
+      braceDepth -= closeBraces;
+      continue;
+    }
+    
+    // Skip import, doc, objective, eq, bind, require constraint, and other documentation/metadata lines
+    if (trimmedLine.match(/^(import|doc|objective|satisfy|verify|:>>|eq\s|bind\s|require\s+constraint|\/\/)/i)) {
+      braceDepth += openBraces;
+      braceDepth -= closeBraces;
+      continue;
+    }
+    
+    // Update brace depth
+    braceDepth += openBraces;
+    braceDepth -= closeBraces;
+    
+    if (braceDepth === 0) {
+      currentClass = null;
+    }
+  }
+  
+  // Generate Mermaid class definitions
+  for (const cls of classes) {
+    mermaid += `  class ${cls.name} {\n`;
+    if (cls.type) {
+      mermaid += `    <<${cls.type}>>\n`;
+    }
+    for (const member of cls.members) {
+      mermaid += `    ${member}\n`;
+    }
+    mermaid += `  }\n`;
+  }
+  
+  // Generate relationships
+  const addedRelationships = new Set();
+  for (const rel of relationships) {
+    const relKey = `${rel.from}-${rel.to}`;
+    if (!addedRelationships.has(relKey)) {
+      addedRelationships.add(relKey);
+      if (rel.type === 'composition') {
+        mermaid += `  ${rel.from} *-- ${rel.to}\n`;
+      } else {
+        mermaid += `  ${rel.from} --> ${rel.to} : ${rel.label || ''}\n`;
+      }
+    }
+  }
+  
+  return mermaid;
+}
+
 function pasteExcalidrawClipboardPayload(payload) {
   if (!payload || payload.type !== "excalidraw/clipboard") return false;
   const elements = Array.isArray(payload.elements)
@@ -6586,6 +6811,24 @@ function tryPasteGraphicsFromClipboard(clipboardData, event = null) {
         return true;
       }
       
+      // Try SysML v2 (async but fire-and-forget for better UX)
+      const sysmlKeywords = [
+        'package', 'part def', 'part', 'attribute def', 'attribute',
+        'port def', 'port', 'connection def', 'connection',
+        'item def', 'item', 'action def', 'action',
+        'state def', 'state', 'requirement def', 'requirement',
+        'use case def', 'use case', 'interface def', 'interface',
+        'allocation def', 'allocation', 'verify', 'satisfy'
+      ];
+      const lowerText = trimmed.toLowerCase();
+      const hasSysMLPattern = /\b(part def|attribute def|port def|connection def|item def|action def|state def|requirement def|use case def|interface def|allocation def)\b/i.test(trimmed);
+      if (sysmlKeywords.some(keyword => lowerText.includes(keyword)) || hasSysMLPattern) {
+        tryPasteSysMLText(text).catch(error => {
+          console.error('SysML v2 paste failed:', error);
+        });
+        return true;
+      }
+      
       if (trimmed.startsWith("data:image")) {
         createImageShapeFromSourceInternal(trimmed);
         return true;
@@ -6769,6 +7012,11 @@ async function triggerPasteFromClipboard() {
             return;
           }
           
+          // Try SysML v2
+          if (await tryPasteSysMLText(text)) {
+            return;
+          }
+          
           // Try other graphics formats
           const trimmed = text.trim();
           if (trimmed.startsWith("data:image")) {
@@ -6796,6 +7044,11 @@ async function triggerPasteFromClipboard() {
       
       // Try Mermaid first
       if (await tryPasteMermaidText(text)) {
+        return;
+      }
+      
+      // Try SysML v2
+      if (await tryPasteSysMLText(text)) {
         return;
       }
       
