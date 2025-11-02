@@ -360,7 +360,7 @@ async function getSelectionClientCenter(page) {
   });
 }
 
-async function resizeShapeFromHandle(page, { shapeId = null, deltaX = 80, deltaY = 80, steps = 8 } = {}) {
+async function resizeShapeFromHandle(page, { shapeId = null, deltaX = 80, deltaY = 80, steps = 8, shiftKey = false, ctrlKey = false, metaKey = false, altKey = false } = {}) {
   const info = await page.evaluate((id) => {
     const api = window.animatorApi;
     if (!api) return null;
@@ -419,19 +419,20 @@ async function resizeShapeFromHandle(page, { shapeId = null, deltaX = 80, deltaY
   const directionDot = direction.x * requestedVector.x + direction.y * requestedVector.y;
   const signedMagnitude = requestedMagnitude * (directionDot >= 0 ? 1 : -1);
 
-  await dispatchPointerEvent(page, 'pointerdown', handle.x, handle.y, {});
+  const modifiers = { shiftKey, ctrlKey, metaKey, altKey };
+  await dispatchPointerEvent(page, 'pointerdown', handle.x, handle.y, modifiers);
   for (let i = 1; i <= steps; i += 1) {
     const progress = i / steps;
     const distance = baseLength + signedMagnitude * progress;
     const targetX = center.x + direction.x * distance;
     const targetY = center.y + direction.y * distance;
-    await dispatchPointerEvent(page, 'pointermove', targetX, targetY, {});
+    await dispatchPointerEvent(page, 'pointermove', targetX, targetY, modifiers);
   }
 
   const finalDistance = baseLength + signedMagnitude;
   const finalX = center.x + direction.x * finalDistance;
   const finalY = center.y + direction.y * finalDistance;
-  await dispatchPointerEvent(page, 'pointerup', finalX, finalY, {});
+  await dispatchPointerEvent(page, 'pointerup', finalX, finalY, modifiers);
 }
 
 async function getConnectorBendHandlePoint(page, shapeId = null) {

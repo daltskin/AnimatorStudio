@@ -3419,8 +3419,15 @@ function resizeGroupSelection(point) {
     y: Math.max(1, Math.abs(point.y - center.y)),
   };
 
-  const scaleX = clampScale(currentVector.x / Math.max(1, startVector.x));
-  const scaleY = clampScale(currentVector.y / Math.max(1, startVector.y));
+  let scaleX = clampScale(currentVector.x / Math.max(1, startVector.x));
+  let scaleY = clampScale(currentVector.y / Math.max(1, startVector.y));
+
+  // Maintain aspect ratio when SHIFT is held
+  if (state.modifiers.shift) {
+    const uniformScale = Math.max(scaleX, scaleY);
+    scaleX = uniformScale;
+    scaleY = uniformScale;
+  }
 
   markHistoryChanged();
   const styleSnapshots = state.pointer.multiStyles || new Map();
@@ -3448,7 +3455,19 @@ function resizeRectangularShape(shape, point, startSnapshot) {
   let width = halfWidth * 2;
   let height = halfHeight * 2;
 
-  if (shape.type === "square") {
+  // Maintain aspect ratio when SHIFT is held (unless shape is square/circle which always maintains aspect)
+  if (state.modifiers.shift && shape.type !== "square" && shape.type !== "circle") {
+    const startAspect = startSnapshot.width / startSnapshot.height;
+    const currentAspect = width / height;
+    
+    if (currentAspect > startAspect) {
+      // Width is proportionally larger, constrain by height
+      height = width / startAspect;
+    } else {
+      // Height is proportionally larger, constrain by width
+      width = height * startAspect;
+    }
+  } else if (shape.type === "square") {
     const size = Math.max(width, height);
     width = size;
     height = size;
@@ -3500,8 +3519,15 @@ function resizeFreeformShape(shape, point, startSnapshot) {
     y: Math.max(1, Math.abs(point.y - center.y)),
   };
 
-  const scaleX = clampScale(currentVector.x / startVector.x);
-  const scaleY = clampScale(currentVector.y / startVector.y);
+  let scaleX = clampScale(currentVector.x / startVector.x);
+  let scaleY = clampScale(currentVector.y / startVector.y);
+
+  // Maintain aspect ratio when SHIFT is held
+  if (state.modifiers.shift) {
+    const uniformScale = Math.max(scaleX, scaleY);
+    scaleX = uniformScale;
+    scaleY = uniformScale;
+  }
 
   shape.live.points = startSnapshot.points.map((pt) => ({
     x: center.x + (pt.x - center.x) * scaleX,
@@ -8879,7 +8905,7 @@ function getCenterFromBounds(bounds) {
 
 function getShapeRotation(shape) {
   if (!shape) return 0;
-  if (shape.type === "rectangle" || shape.type === "diamond" || shape.type === "square" || shape.type === "circle" || shape.type === "text") {
+  if (shape.type === "rectangle" || shape.type === "diamond" || shape.type === "square" || shape.type === "circle" || shape.type === "text" || shape.type === "image") {
     if (typeof shape.live.rotation === "number") {
       return shape.live.rotation;
     }
