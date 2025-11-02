@@ -5455,17 +5455,45 @@ function pasteSvgContent(svgText) {
   }
 }
 
+const MAX_EXCALIDRAW_JSON_SIZE = 5000000; // 5MB limit for entire Excalidraw JSON (includes base64 images)
+const MAX_EXCALIDRAW_FILE_SIZE = 3000000; // 3MB limit per individual embedded image
+
 function tryPasteExcalidrawText(text) {
   if (typeof text !== "string") return false;
   const trimmed = text.trim();
   if (!trimmed || !trimmed.startsWith("{")) return false;
   if (!trimmed.includes("\"excalidraw/clipboard\"")) return false;
+  
+  // Reject if entire JSON is excessively large to prevent memory issues
+  if (trimmed.length > MAX_EXCALIDRAW_JSON_SIZE) return false;
+  
   let payload = null;
   try {
     payload = JSON.parse(trimmed);
   } catch (error) {
     return false;
   }
+  
+  // Check if payload contains embedded files with base64 data
+  if (payload && typeof payload.files === "object" && payload.files !== null) {
+    // Check total size of embedded files
+    let totalFileSize = 0;
+    for (const fileId in payload.files) {
+      const file = payload.files[fileId];
+      if (file && typeof file.dataURL === "string") {
+        totalFileSize += file.dataURL.length;
+        // Reject if any individual file is too large
+        if (file.dataURL.length > MAX_EXCALIDRAW_FILE_SIZE) {
+          return false;
+        }
+      }
+    }
+    // Reject if total embedded file size exceeds limit (4MB total for all files)
+    if (totalFileSize > MAX_EXCALIDRAW_FILE_SIZE * 1.5) {
+      return false;
+    }
+  }
+  
   return pasteExcalidrawClipboardPayload(payload);
 }
 
@@ -5992,6 +6020,14 @@ async function tryPasteMermaidText(text, options = {}) {
   const trimmed = text.trim();
   if (!trimmed) return false;
 
+  // Skip if text looks like base64 data or is excessively long
+  const isLikelyBase64 = /^[A-Za-z0-9+/=]+$/.test(trimmed) || trimmed.startsWith('data:');
+  if (isLikelyBase64) return false;
+  
+  // Skip if text is too large (likely not Mermaid code)
+  const MAX_MERMAID_SIZE = 50000; // 50KB should be more than enough for Mermaid diagrams
+  if (trimmed.length > MAX_MERMAID_SIZE) return false;
+
   // Detect common Mermaid diagram keywords
   const mermaidKeywords = [
     'graph', 'flowchart', 'sequenceDiagram', 'classDiagram', 'stateDiagram',
@@ -6041,6 +6077,15 @@ async function tryPasteSysMLText(text, options = {}) {
   if (typeof text !== "string") return false;
   const trimmed = text.trim();
   if (!trimmed) return false;
+
+  // Skip if text looks like base64 data or is excessively long
+  // Base64 data typically has no whitespace and uses a limited character set
+  const isLikelyBase64 = /^[A-Za-z0-9+/=]+$/.test(trimmed) || trimmed.startsWith('data:');
+  if (isLikelyBase64) return false;
+  
+  // Skip if text is too large (likely not SysML code)
+  const MAX_SYSML_SIZE = 50000; // 50KB should be more than enough for SysML code
+  if (trimmed.length > MAX_SYSML_SIZE) return false;
 
   // Detect SysML v2 keywords and syntax patterns
   const sysmlKeywords = [
@@ -6327,7 +6372,7 @@ function pasteExcalidrawClipboardPayload(payload) {
   const offsetX = stageWidth > 0 ? stageWidth / 2 - (globalWidth * scale) / 2 : 0;
   const offsetY = stageHeight > 0 ? stageHeight / 2 - (globalHeight * scale) / 2 : 0;
 
-  const context = { scale, offsetX, offsetY, minX, minY, stageWidth, stageHeight };
+  const context = { scale, offsetX, offsetY, minX, minY, stageWidth, stageHeight, files: payload.files || {} };
   const plans = elements
     .map((element, index) => {
       const plan = createExcalidrawElementPlan(element, context);
@@ -6373,6 +6418,7 @@ function pasteExcalidrawClipboardPayload(payload) {
         select: false,
         addHistory: false,
         liveRect: plan.payload.liveRect,
+        styleOverrides: plan.payload.styleOverrides,
       });
       if (created && Number.isFinite(created.id)) {
         const actual = getShapeById(created.id);
@@ -6654,6 +6700,33 @@ function createExcalidrawElementPlan(element, context) {
           },
           live: {
             points,
+          },
+        },
+      };
+    }
+    case "image": {
+      // Excalidraw image elements reference files by fileId
+      if (!element.fileId || !context.files) {
+        return null;
+      }
+      const file = context.files[element.fileId];
+      if (!file || typeof file.dataURL !== "string") {
+        return null;
+      }
+      
+      return {
+        kind: "image",
+        payload: {
+          dataUrl: file.dataURL,
+          liveRect: {
+            x: baseX,
+            y: baseY,
+            width: scaledWidth,
+            height: scaledHeight,
+            rotation: rotationDegrees,
+          },
+          styleOverrides: {
+            opacity,
           },
         },
       };

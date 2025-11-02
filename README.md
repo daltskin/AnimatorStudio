@@ -19,6 +19,7 @@ Have a play with it [here](https://animatorstudio.gentlebay-3289cfef.westus2.azu
 - **Grouping that sticks:** Combine shapes, move them as a unit, and ungroup when you need to iterate; marquee selection respects grouped clusters.
 - **Mermaid diagram support:** Paste Mermaid diagram syntax (flowcharts, sequence diagrams, class diagrams, etc.) and it auto-renders as a high-quality image shape ready for animation.
 - **SysML v2 modeling support:** Paste SysML v2 textual syntax and it will be automatically converted to Mermaid class diagrams for visualization. Supports common constructs like part definitions, attributes, ports, connections, and requirements.
+- **Excalidraw import:** Copy content from Excalidraw (including shapes AND embedded images) and paste directly into Animator. All elements import as editable shapes, maintaining position, size, rotation, and opacity. Supports large files with nested dataURL content up to 5MB.
 - **Alignment guides & snapping:** Hold CTRL (or CMD on Mac) while moving, resizing, or rotating shapes to see visual alignment guides and snap to other shapes for pixel-perfect positioning.
 - **Timeline-first workflow:** Scrub or type the duration, drop keyframes per shape, and play back loops or bounce animations with one click.
 - **Scene + GIF export:** Download JSON snapshots for round-tripping or capture animated GIFs directly from the timeline.
