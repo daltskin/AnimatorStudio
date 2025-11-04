@@ -32,6 +32,7 @@
               <input type="file" id="importSceneInput" accept="application/json" hidden />
               <button type="button" id="exportScene" class="ghost" role="option" title="Export the current scene as JSON">Export scene (.json)</button>
               <button type="button" id="exportGif" class="ghost" role="option" title="Export an animated GIF">Export GIF</button>
+              <button type="button" id="exportMp4" class="ghost" role="option" title="Export an MP4 video">Export MP4</button>
               <p id="exportStatus" data-variant="idle" aria-live="polite">Exporter standing by</p>
             </div>
           </details>
@@ -405,7 +406,7 @@
                 </label>
                 <label class="control compact">
                   <span>Export FPS</span>
-                  <input type="number" id="exportFps" min="1" max="60" value="12" title="Set frames per second for exports" />
+                  <input type="number" id="exportFps" min="1" max="60" value="25" title="Set frames per second for exports" />
                 </label>
                 <div class="time-display">
                   <span id="currentTime">0.0s</span>

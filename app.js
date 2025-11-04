@@ -87,6 +87,7 @@ const elements = {
   exportFps: document.getElementById("exportFps"),
   exportScene: document.getElementById("exportScene"),
   exportGif: document.getElementById("exportGif"),
+  exportMp4: document.getElementById("exportMp4"),
   exportStatus: document.getElementById("exportStatus"),
   exportMenu: document.querySelector(".export-menu"),
   clearCanvas: document.getElementById("clearCanvas"),
@@ -296,7 +297,7 @@ const state = {
     loop: true,
     bounce: false,
     direction: 1,
-    exportFps: elements.exportFps ? Number(elements.exportFps.value) || 12 : 12,
+    exportFps: elements.exportFps ? Number(elements.exportFps.value) || 25 : 25,
     selectedKeyframeTime: null,
     selectedKeyframeShapeId: null,
   },
@@ -1281,6 +1282,11 @@ function bindEvents() {
     handleExportGif();
   });
 
+  elements.exportMp4?.addEventListener("click", () => {
+    closeExportMenu();
+    handleExportMp4();
+  });
+
   elements.loopToggle?.addEventListener("change", (event) => {
     state.timeline.loop = Boolean(event.target.checked);
     state.timeline.direction = 1;
@@ -1292,7 +1298,7 @@ function bindEvents() {
   });
 
   elements.exportFps?.addEventListener("change", (event) => {
-    const value = Math.max(1, Math.min(60, Number(event.target.value) || state.timeline.exportFps || 12));
+    const value = Math.max(1, Math.min(60, Number(event.target.value) || state.timeline.exportFps || 25));
     state.timeline.exportFps = value;
     event.target.value = String(value);
   });
@@ -7915,7 +7921,10 @@ function advanceTimelineBy(deltaSeconds) {
       state.timeline.direction = -1;
     } else if (updated <= 0) {
       updated = 0;
-      state.timeline.direction = 1;
+      // Bounce should stop after returning to the beginning
+      setTimelineTime(updated, { apply: true });
+      stopPlayback();
+      return state.timeline.current;
     }
   } else if (state.timeline.loop) {
     if (updated > duration) {
@@ -8993,7 +9002,7 @@ function handleSceneImport(event) {
 }
 
 async function handleExportGif() {
-  const fps = state.timeline.exportFps || 12;
+  const fps = state.timeline.exportFps || 25;
   const duration = Math.max(0, state.timeline.duration);
   const maxFrames = 600;
   const step = fps > 0 ? 1 / fps : 0.1;
@@ -9078,6 +9087,145 @@ async function handleExportGif() {
   }
 }
 
+async function handleExportMp4() {
+  const fps = state.timeline.exportFps || 25;
+  const duration = Math.max(0, state.timeline.duration);
+
+  if (duration === 0) {
+    updateExportStatus("Single static frame – video not exported", "error");
+    alert("MP4 export requires animation with duration > 0.");
+    return;
+  }
+
+  // Check if MediaRecorder is supported
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+    if (!window.MediaRecorder || !MediaRecorder.isTypeSupported('video/webm;codecs=vp8')) {
+      updateExportStatus("MP4 export not supported in this browser", "error");
+      alert("MP4 export is not supported in your browser. Please try Chrome, Firefox, or Edge.");
+      return;
+    }
+  }
+
+  updateExportStatus("Recording video…", "info");
+
+  const originalTime = state.timeline.current;
+  const originalBounce = state.timeline.bounce;
+  const originalLoop = state.timeline.loop;
+
+  try {
+    // Create a MediaRecorder from the canvas stream
+    const stream = canvas.captureStream(fps);
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') 
+      ? 'video/webm;codecs=vp9' 
+      : 'video/webm;codecs=vp8';
+    
+    const mediaRecorder = new MediaRecorder(stream, {
+      mimeType: mimeType,
+      videoBitsPerSecond: 8000000, // 8 Mbps for good quality
+    });
+
+    const chunks = [];
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        chunks.push(event.data);
+      }
+    };
+
+    // Start recording
+    mediaRecorder.start();
+
+    // Animate through the timeline at real-time speed
+    const startRecordingTime = performance.now();
+    // For loop mode, capture 3 iterations to show the loop effect (since MP4 doesn't support native looping)
+    // For bounce mode, capture one complete bounce (forward + backward)
+    const loopMultiplier = originalLoop ? 3 : 1;
+    const animationDuration = originalBounce ? duration * 2 : duration * loopMultiplier;
+    const pauseDuration = 1.0; // 1 second pause at the end
+    const targetDuration = animationDuration + pauseDuration;
+
+    const animate = () => {
+      // Calculate the current time based on elapsed real time
+      const elapsedSeconds = (performance.now() - startRecordingTime) / 1000;
+      
+      if (elapsedSeconds >= targetDuration) {
+        // Stop recording when we've reached the target duration (including pause)
+        mediaRecorder.stop();
+        return;
+      }
+
+      // Calculate timeline position based on elapsed time
+      let time = Math.min(elapsedSeconds, animationDuration); // Clamp during pause
+      if (elapsedSeconds < animationDuration) {
+        // Animate normally until we reach the animation duration
+        if (originalBounce) {
+          // For bounce mode, map the elapsed time to bounce back and forth
+          if (time <= duration) {
+            // Forward phase
+            time = time;
+          } else {
+            // Backward phase
+            time = duration - (time - duration);
+          }
+        } else if (originalLoop) {
+          // For loop mode, wrap the time
+          time = time % duration;
+        } else {
+          // For normal mode, clamp to duration
+          time = Math.min(time, duration);
+        }
+      } else {
+        // During the pause, hold at the final frame
+        if (originalBounce) {
+          time = 0; // Bounce ends at start
+        } else {
+          time = duration; // Normal/loop ends at duration
+        }
+      }
+
+      // Update and render the frame
+      setTimelineTime(time, { apply: true });
+      renderFrameToContext(ctx);
+
+      // Continue animating
+      requestAnimationFrame(animate);
+    };
+
+    mediaRecorder.onstop = async () => {
+      updateExportStatus("Encoding video…", "info");
+      
+      // Create blob from recorded chunks
+      const blob = new Blob(chunks, { type: mimeType });
+      
+      // Download the WebM file (browsers don't support direct MP4 encoding)
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `animator-export-${Date.now()}.webm`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      
+      updateExportStatus("Video download ready (WebM format)", "success");
+      setTimelineTime(originalTime, { apply: true });
+    };
+
+    mediaRecorder.onerror = (error) => {
+      console.error("MP4 export failed", error);
+      updateExportStatus("Video export failed", "error");
+      alert("Video export failed. Please try again.");
+      setTimelineTime(originalTime, { apply: true });
+    };
+
+    // Start the animation
+    requestAnimationFrame(animate);
+
+  } catch (error) {
+    console.error("MP4 export failed", error);
+    updateExportStatus("Video export failed", "error");
+    alert("Video export failed. Please try again.");
+    setTimelineTime(originalTime, { apply: true });
+  }
+}
+
 function cloneShape(shape) {
   if (!shape) return null;
   const clone = {
@@ -9133,7 +9281,7 @@ function buildSceneExportPayload() {
       duration: state.timeline.duration,
       loop: state.timeline.loop,
       bounce: state.timeline.bounce,
-      exportFps: state.timeline.exportFps || 12,
+      exportFps: state.timeline.exportFps || 25,
     },
     shapes: state.shapes.map((shape) => {
       const serialized = cloneShape(shape);
@@ -9461,7 +9609,7 @@ function createAnimatorApi() {
     return selected.length > 0 ? selected[0] : null;
   };
 
-  const captureTimelineFrames = async ({ fps = state.timeline.exportFps || 12, maxFrames = 360, onFrame } = {}) => {
+  const captureTimelineFrames = async ({ fps = state.timeline.exportFps || 25, maxFrames = 360, onFrame } = {}) => {
     const duration = Math.max(0, state.timeline.duration);
     const step = fps <= 0 ? 0 : 1 / fps;
     const originalTime = state.timeline.current;
