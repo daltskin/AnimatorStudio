@@ -19,6 +19,7 @@
 - **Line tool controls:** The line tool exposes arrowhead modes via the `[data-arrow-mode]` radiogroup and a dedicated bend slider that only appears while the line tool is active. Reuse `setLineArrowMode`, `updateLineArrowControls`, and `updateLineBendVisibility` when tweaking those flows so selection state and defaults stay in sync.
 - **Stage boundaries:** All shapes (live data and keyframe snapshots) must stay inside the stage rectangle. Use the existing confinement helpers (e.g. `confineShapesToStage`, `confineSnapshotToStage`) whenever importing scenes, pasting shapes, or altering stage dimensions so nothing renders outside the canvas.
 - **Styling:** Global styles live in `styles.css`. Disabled buttons rely on the `.disabled` class and native `[disabled]` selector; keep Add Keyframe UX consistent.
+- **UI consistency:** All interactive buttons and floating menus must have identical hover states for consistency. Standard hover treatment across the entire app: `background: rgba(99, 102, 241, 0.22)`, `border-color: rgba(99, 102, 241, 0.55)`. This applies to tool buttons, toolbar toggles, zoom controls, ghost buttons, and all floating menus. The only exceptions are primary action buttons (using `--accent` colors) and danger buttons (using red tones). Floating menus (tool menu and toolbar menu) share: `background: rgba(17, 24, 39, 0.85)`, `border: 1px solid rgba(255, 255, 255, 0.16)`, `box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45)`, `backdrop-filter: blur(18px)`, `border-radius: 1.25rem`, `padding: 0.6rem 0.75rem`.
 
 ## Testing & verification
 
