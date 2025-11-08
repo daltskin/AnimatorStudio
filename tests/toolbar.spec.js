@@ -530,9 +530,11 @@ test.describe('Toolbar interactions', () => {
     const firstCenterX = canvasRect.x + first.centerX;
     const firstCenterY = canvasRect.y + first.centerY;
     await page.keyboard.down(modifierKey);
+    await page.waitForTimeout(50); // Wait for modifier to register
     await page.mouse.move(firstCenterX, firstCenterY);
     await page.mouse.down();
     await page.mouse.up();
+    await page.waitForTimeout(100); // Wait for click to process
     await page.keyboard.up(modifierKey);
 
     await expect.poll(() => page.evaluate(() => window.animatorState.selectedIds.size)).toBe(2);

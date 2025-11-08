@@ -59,13 +59,17 @@ test.describe("Alignment guides", () => {
     await page.mouse.move(shape2Center.x, shape2Center.y);
     await page.mouse.down();
     
+    // Move a small amount to establish 'moving' mode first
+    await page.mouse.move(shape2Center.x - 1, shape2Center.y - 1, { steps: 3 });
+    await page.waitForTimeout(50);
+    
     // NOW hold CTRL to activate alignment guides during drag
     await page.keyboard.down("Control");
     await page.waitForTimeout(50);
     
-    // Move just 2 pixels - should snap to alignment (copy exact from alignment.snap.js)
-    await page.mouse.move(shape2Center.x - 2, shape2Center.y - 2, { steps: 5 });
-    await page.waitForTimeout(100);
+    // Move towards the first rectangle to trigger horizontal alignment
+    await page.mouse.move(shape2Center.x - 20, shape2Center.y - 3, { steps: 15 });
+    await page.waitForTimeout(300);
 
     // Check that alignment guides appeared (copy exact from alignment.snap.js)
     const guides = await page.evaluate(() => {
@@ -185,13 +189,17 @@ test.describe("Alignment guides", () => {
     await page.mouse.move(shape2Center.x, shape2Center.y);
     await page.mouse.down();
     
+    // Move a larger amount to ensure 'moving' mode is established
+    await page.mouse.move(shape2Center.x - 5, shape2Center.y - 2, { steps: 5 });
+    await page.waitForTimeout(100);
+    
     // NOW hold CTRL to activate alignment guides during drag
     await page.keyboard.down("Control");
-    await page.waitForTimeout(50);
-    
-    // Move just 2 pixels - should trigger alignment guides
-    await page.mouse.move(shape2Center.x - 2, shape2Center.y - 2, { steps: 5 });
     await page.waitForTimeout(100);
+    
+    // Move towards the first rectangle to trigger alignment guides
+    await page.mouse.move(shape2Center.x - 20, shape2Center.y + 3, { steps: 15 });
+    await page.waitForTimeout(300);
 
     // Check that alignment guides appeared
     const guides = await page.evaluate(() => {
