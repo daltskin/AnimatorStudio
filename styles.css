@@ -1154,9 +1154,7 @@ button.danger:disabled {
 
 .timeline-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 1rem;
   position: relative;
 }
@@ -1171,7 +1169,7 @@ button.danger:disabled {
   justify-content: center;
   padding: 0.6rem 0.75rem;
   border-radius: 1.25rem;
-  background: rgba(17, 24, 39, 0.72);
+  background: rgba(17, 24, 39, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(18px);
@@ -1259,6 +1257,15 @@ button.danger:disabled {
 }
 
 .timeline-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.timeline-controls-left {
   display: flex;
   align-items: center;
   gap: 0.75rem;
