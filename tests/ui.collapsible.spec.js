@@ -155,7 +155,6 @@ test.describe("Collapsible UI Elements", () => {
   test("buttons have consistent hover effects", async ({ page }) => {
     // Get various buttons
     const toolButton = page.locator(".tool-button[data-tool='rectangle']");
-    const ghostButton = page.locator("button.ghost").first();
     
     // Hover over tool button
     await toolButton.hover();
