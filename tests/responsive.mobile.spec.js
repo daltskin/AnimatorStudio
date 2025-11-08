@@ -179,10 +179,11 @@ test.describe("Mobile Responsive Design", () => {
     const endX = canvasBox.x + 200;
     const endY = canvasBox.y + 200;
 
-    await page.touchscreen.tap(startX, startY);
+    await page.touchscreen.touchStart(startX, startY);
     await page.waitForTimeout(50);
-    await page.mouse.move(endX, endY);
-    await page.touchscreen.tap(endX, endY);
+    await page.touchscreen.touchMove(endX, endY);
+    await page.waitForTimeout(50);
+    await page.touchscreen.touchEnd();
 
     // Check if shape was created
     const shapeCount = await page.evaluate(() => {
