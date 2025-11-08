@@ -3381,6 +3381,8 @@ function finalizeActiveTextEditor({ cancel = false } = {}) {
   }
 
   updateTextMetrics(shape, { keepCenter: true });
+  // Only write keyframe when text editing is committed (not cancelled)
+  // This ensures cancelled edits don't pollute the timeline
   if (!cancel) {
     ensureBaseKeyframe(shape, state.timeline.current);
     writeKeyframe(shape, state.timeline.current, { markSelected: false });
