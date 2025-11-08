@@ -77,7 +77,10 @@ test('text shapes stay selectable and rotatable after inline edits', async ({ pa
   await dispatchPointerEvent(page, 'pointerup', outsideX, outsideY, {});
   await ensureSelectionCount(page, 0);
 
-  await dispatchPointerEvent(page, 'pointerdown', center.x, center.y, {});
-  await dispatchPointerEvent(page, 'pointerup', center.x, center.y, {});
+  // Get fresh center coordinates after text edit since shape bounds may have changed
+  const { center: freshCenter } = await getRotationHandleInfo(page, shape.id);
+
+  await dispatchPointerEvent(page, 'pointerdown', freshCenter.x, freshCenter.y, {});
+  await dispatchPointerEvent(page, 'pointerup', freshCenter.x, freshCenter.y, {});
   await ensureSelectionCount(page, 1);
 });

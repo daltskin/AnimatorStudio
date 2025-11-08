@@ -115,6 +115,8 @@ const elements = {
   toolbar: document.querySelector(".toolbar"),
   floatingToolMenu: document.querySelector(".floating-tool-menu"),
   toolMenuToggle: document.querySelector("[data-tool-menu-toggle]"),
+  timelineToggles: Array.from(document.querySelectorAll("[data-timeline-toggle]")),
+  timeline: document.querySelector(".timeline"),
 };
 
 const FONT_FALLBACKS = {
@@ -256,6 +258,7 @@ const state = {
   hoverHandle: null,
   toolbarCollapsed: false,
   toolMenuCollapsed: false,
+  timelineCollapsed: false,
   style: {
     fill: elements.fillColor.value,
     fillStyle: normalizeFillStyle(getInitialFillStyle(), DEFAULT_FILL_STYLE),
@@ -342,6 +345,7 @@ const state = {
     offset: { x: 32, y: 32 },
   },
   activeTextEditor: null,
+  activeLabelEditor: null,
   groups: {},
   activeGroupId: null,
   activeGroup: null,
@@ -369,6 +373,41 @@ function saveToolbarCollapsedPreference(collapsed) {
     window.localStorage?.setItem(TOOLBAR_COLLAPSED_STORAGE_KEY, collapsed ? "1" : "0");
   } catch (error) {
     console.warn("Failed to persist toolbar collapse preference", error);
+  }
+}
+
+function toggleTimelineVisibility() {
+  state.timelineCollapsed = !state.timelineCollapsed;
+  applyTimelineCollapsedState({ scheduleResize: true });
+}
+
+function applyTimelineCollapsedState({ scheduleResize = false } = {}) {
+  const collapsed = Boolean(state.timelineCollapsed);
+
+  if (elements.appShell) {
+    elements.appShell.classList.toggle("timeline-collapsed", collapsed);
+  }
+
+  const label = collapsed ? "Show the timeline" : "Hide the timeline";
+  const stateValue = collapsed ? "collapsed" : "expanded";
+  if (Array.isArray(elements.timelineToggles)) {
+    elements.timelineToggles.forEach((button) => {
+      if (!button) return;
+      button.setAttribute("aria-pressed", collapsed ? "true" : "false");
+      button.setAttribute("aria-label", label);
+      button.title = label;
+      button.dataset.timelineState = stateValue;
+    });
+  }
+
+  if (elements.timeline) {
+    elements.timeline.setAttribute("aria-hidden", collapsed ? "true" : "false");
+  }
+
+  if (scheduleResize) {
+    window.requestAnimationFrame(() => {
+      resizeCanvas();
+    });
   }
 }
 
@@ -575,6 +614,10 @@ function cloneShapeForHistory(shape) {
 
   if (shape.groupId) {
     clone.groupId = shape.groupId;
+  }
+
+  if (shape.label) {
+    clone.label = shape.label;
   }
 
   if (shape.asset) {
@@ -815,6 +858,7 @@ const MARQUEE_EPSILON = 0.5;
 function init() {
   restoreToolbarCollapsedPreference();
   restoreToolMenuCollapsedPreference();
+  applyTimelineCollapsedState({ scheduleResize: false });
   resizeCanvas();
   bindEvents();
   initializeTipsPanel();
@@ -956,6 +1000,7 @@ function resizeCanvas() {
 
   updateStageDimensionsLabel();
   repositionActiveTextEditor();
+  repositionActiveLabelEditor();
   applyZoom();
   updateZoomDisplay();
 }
@@ -1006,6 +1051,12 @@ function bindEvents() {
     });
   }
 
+  if (Array.isArray(elements.timelineToggles)) {
+    elements.timelineToggles.forEach((button) => {
+      button.addEventListener("click", toggleTimelineVisibility);
+    });
+  }
+
   if (elements.toolMenuToggle) {
     elements.toolMenuToggle.addEventListener("click", toggleToolMenuVisibility);
   }
@@ -1020,6 +1071,14 @@ function bindEvents() {
     state.style.fill = event.target.value;
     if (state.selection) {
       state.selection.style.fill = event.target.value;
+      commitShapeChange(state.selection);
+    }
+  });
+
+  elements.strokeColor.addEventListener("input", (event) => {
+    state.style.stroke = event.target.value;
+    if (state.selection) {
+      state.selection.style.stroke = event.target.value;
       commitShapeChange(state.selection);
     }
   });
@@ -1060,14 +1119,6 @@ function bindEvents() {
     });
   }
 
-  elements.strokeColor.addEventListener("input", (event) => {
-    state.style.stroke = event.target.value;
-    if (state.selection) {
-      state.selection.style.stroke = event.target.value;
-      commitShapeChange(state.selection);
-    }
-  });
-
   elements.strokeWidth.addEventListener("input", (event) => {
     const value = Number(event.target.value);
     state.style.strokeWidth = value;
@@ -1107,6 +1158,20 @@ function bindEvents() {
         commitShapeChange(state.selection);
         repositionActiveTextEditor();
       }
+      // Update label font if label editor is active
+      if (state.activeLabelEditor) {
+        const shape = state.shapes.find((s) => s.id === state.activeLabelEditor.shapeId);
+        if (shape) {
+          shape.labelFont = value;
+          repositionActiveLabelEditor();
+        }
+      }
+      // Update label font if selected shape has a label
+      if (state.selection && state.selection.label && state.selection.type !== "text") {
+        state.selection.labelFont = value;
+        commitShapeChange(state.selection);
+      }
+      render();
     });
   }
 
@@ -1155,7 +1220,10 @@ function bindEvents() {
   canvas.addEventListener("dblclick", handleCanvasDoubleClick);
   window.addEventListener("mousemove", handleMouseMoveFallback);
   window.addEventListener("mouseup", handleMouseUpFallback);
-  window.addEventListener("scroll", repositionActiveTextEditor);
+  window.addEventListener("scroll", () => {
+    repositionActiveTextEditor();
+    repositionActiveLabelEditor();
+  });
   window.addEventListener("pointerdown", handleGlobalPointerDownForContextMenu);
   window.addEventListener("blur", closeAllContextMenus);
   window.addEventListener("blur", resetModifierState);
@@ -1316,6 +1384,7 @@ function bindEvents() {
 
 function setTool(tool) {
   finalizeActiveTextEditor();
+  finalizeActiveLabelEditor();
   closeAllContextMenus();
   state.tool = tool;
   updateStrokeWidthControl(tool);
@@ -1369,6 +1438,7 @@ function render() {
   }
   drawShapes(ctx);
   drawAlignmentGuides(ctx);
+  drawConnectionHighlight(ctx);
   drawSelectionBounds(ctx);
   ctx.restore();
 
@@ -1445,6 +1515,10 @@ function drawShape(context, shape) {
       break;
     default:
       break;
+  }
+  
+  if (shape.label && shape.type !== "text") {
+    drawShapeLabel(context, shape);
   }
 }
 
@@ -2005,6 +2079,78 @@ function drawTextShape(context, shape) {
   context.restore();
 }
 
+function drawShapeLabel(context, shape) {
+  if (!shape || !shape.label || shape.type === "text") return;
+  
+  const label = String(shape.label);
+  if (label.length === 0) return;
+  
+  // For curved lines/arrows, calculate the midpoint of the curve
+  let center, rotation;
+  if ((shape.type === "line" || shape.type === "arrow") && shape.live.control) {
+    // Quadratic bezier midpoint at t=0.5
+    const t = 0.5;
+    const mt = 1 - t;
+    const curvePoint = {
+      x: mt * mt * shape.live.start.x + 2 * mt * t * shape.live.control.x + t * t * shape.live.end.x,
+      y: mt * mt * shape.live.start.y + 2 * mt * t * shape.live.control.y + t * t * shape.live.end.y,
+    };
+    
+    // Calculate the straight line midpoint
+    const straightMidpoint = {
+      x: (shape.live.start.x + shape.live.end.x) / 2,
+      y: (shape.live.start.y + shape.live.end.y) / 2,
+    };
+    
+    // Offset label towards the curve (halfway between curve point and straight midpoint)
+    center = {
+      x: (curvePoint.x + straightMidpoint.x) / 2,
+      y: (curvePoint.y + straightMidpoint.y) / 2,
+    };
+    rotation = 0; // Keep label horizontal on curved lines
+  } else {
+    center = getShapeCenter(shape);
+    rotation = getShapeRotation(shape);
+  }
+  
+  const fontSize = shape.labelSize || 16;
+  const fontFamily = shape.labelFont || DEFAULT_TEXT_FONT;
+  
+  context.save();
+  context.translate(center.x, center.y);
+  context.rotate(rotation);
+  
+  context.font = `${fontSize}px ${getFontStack(fontFamily)}`;
+  context.textBaseline = "middle";
+  context.textAlign = "center";
+  
+  // Measure text to create background
+  const metrics = context.measureText(label);
+  const textWidth = metrics.width;
+  const textHeight = fontSize;
+  const padding = 4;
+  
+  const opacity = resolveShapeOpacity(shape.style);
+  withGlobalOpacity(context, opacity, () => {
+    // Draw background for line/arrow labels to hide the line behind the text
+    if (shape.type === "line" || shape.type === "arrow") {
+      context.fillStyle = state.stage.background || DEFAULT_STAGE_BACKGROUND;
+      context.fillRect(
+        -textWidth / 2 - padding,
+        -textHeight / 2 - padding / 2,
+        textWidth + padding * 2,
+        textHeight + padding
+      );
+    }
+    
+    // Draw label text
+    context.fillStyle = "#111827";
+    context.fillText(label, 0, 0);
+  });
+  
+  context.restore();
+}
+
 function drawArrowHead(context, start, end, size, style) {
   const angle = Math.atan2(end.y - start.y, end.x - start.x);
   const headLength = Math.max(8, size);
@@ -2226,6 +2372,44 @@ function drawSelectionBounds(context) {
   context.restore();
 }
 
+function drawConnectionHighlight(context) {
+  const highlightShape = getConnectionHighlightShape();
+  if (!highlightShape) return;
+  
+  context.save();
+  context.strokeStyle = "rgba(59, 130, 246, 0.8)"; // Blue highlight
+  context.lineWidth = 3;
+  context.setLineDash([8, 4]);
+  
+  const bounds = getShapeBounds(highlightShape);
+  const padding = 8;
+  
+  if (highlightShape.type === "circle") {
+    const center = getShapeCenter(highlightShape);
+    const radius = highlightShape.live.width / 2 + padding;
+    context.beginPath();
+    context.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    context.stroke();
+  } else {
+    const rotation = getShapeRotation(highlightShape);
+    const center = getShapeCenter(highlightShape);
+    
+    context.translate(center.x, center.y);
+    context.rotate(rotation);
+    
+    context.beginPath();
+    context.rect(
+      -bounds.width / 2 - padding,
+      -bounds.height / 2 - padding,
+      bounds.width + padding * 2,
+      bounds.height + padding * 2
+    );
+    context.stroke();
+  }
+  
+  context.restore();
+}
+
 function drawAlignmentGuides(context) {
   if (state.pointer.mode !== "moving") return;
   
@@ -2420,8 +2604,12 @@ function handlePointerDown(event) {
 
   const targetNode = event.target;
   const clickedInsideEditor = targetNode instanceof Element && targetNode.closest(".canvas-text-editor");
+  const clickedInsideLabelEditor = targetNode instanceof Element && targetNode.closest(".canvas-label-editor");
   if (!clickedInsideEditor) {
     finalizeActiveTextEditor();
+  }
+  if (!clickedInsideLabelEditor) {
+    finalizeActiveLabelEditor();
   }
 
   const multiSelected = state.selectedIds.size > 1;
@@ -2628,9 +2816,69 @@ function updateCanvasCursor() {
   }
 }
 
+function updateHoverCursor(point) {
+  if (!canvas || state.tool !== "select") {
+    canvas.style.cursor = "";
+    return;
+  }
+  
+  // Check if hovering over a selected shape
+  if (state.selection) {
+    // Check for rotation handle
+    const rotateHandle = detectRotateHandle(state.selection, point);
+    if (rotateHandle) {
+      canvas.style.cursor = "grab";
+      return;
+    }
+    
+    // Check for resize handle
+    const resizeHandle = detectResizeHandle(state.selection, point);
+    if (resizeHandle) {
+      canvas.style.cursor = "nwse-resize";
+      return;
+    }
+    
+    // Check for line handles
+    if (state.selection.type === "line" || state.selection.type === "arrow") {
+      const bendHandle = detectLineBendHandle(state.selection, point);
+      if (bendHandle) {
+        canvas.style.cursor = "grab";
+        return;
+      }
+      
+      const lineHandle = detectLineEndpointHandle(state.selection, point);
+      if (lineHandle) {
+        canvas.style.cursor = "grab";
+        return;
+      }
+    }
+    
+    // Check if hovering over the selected shape body (for moving)
+    if (isPointInsideShape(state.selection, point)) {
+      canvas.style.cursor = "move";
+      return;
+    }
+  }
+  
+  // Check if hovering over any shape
+  const shape = hitTest(point);
+  if (shape) {
+    canvas.style.cursor = "move";
+    return;
+  }
+  
+  canvas.style.cursor = "";
+}
+
 function handlePointerMove(event) {
-  if (!state.pointer.down) return;
   const point = getCanvasPoint(event);
+  
+  // Handle hover cursor when not dragging
+  if (!state.pointer.down) {
+    updateHoverCursor(point);
+    return;
+  }
+  
   state.pointer.current = point;
 
   if (state.pointer.mode === "text-pending" || state.pointer.mode === "text-dragging") {
@@ -2795,6 +3043,20 @@ function handlePointerUp(event) {
       renderKeyframeList();
     } else {
       commitShapeChange(state.selection);
+      
+      // Write keyframes for any connected lines
+      if (state.selection && (pointerMode === "moving" || pointerMode === "resizing" || pointerMode === "rotating")) {
+        state.shapes.forEach((shape) => {
+          if (shape.type !== "line" && shape.type !== "arrow") return;
+          if (!shape.connections) return;
+          const isConnectedToSelection = 
+            (shape.connections.start && shape.connections.start.shapeId === state.selection.id) ||
+            (shape.connections.end && shape.connections.end.shapeId === state.selection.id);
+          if (isConnectedToSelection) {
+            writeKeyframe(shape, state.timeline.current, { apply: false, render: false, markSelected: false });
+          }
+        });
+      }
     }
     shouldFinalizeHistory = true;
   } else if (pointerMode === "creating" || pointerMode === "drawing-free") {
@@ -2976,6 +3238,11 @@ function handleCanvasDoubleClick(event) {
     event.stopPropagation();
     updateSelection(shape);
     startTextEditing(shape, { focus: true, selectAll: true });
+  } else if (shape) {
+    event.preventDefault();
+    event.stopPropagation();
+    updateSelection(shape);
+    startLabelEditing(shape, { focus: true, selectAll: true });
   }
 }
 
@@ -3117,9 +3384,8 @@ function finalizeActiveTextEditor({ cancel = false } = {}) {
   updateTextMetrics(shape, { keepCenter: true });
   if (!cancel) {
     ensureBaseKeyframe(shape, state.timeline.current);
-  writeKeyframe(shape, state.timeline.current, { markSelected: false });
+    writeKeyframe(shape, state.timeline.current, { markSelected: false });
   }
-  repositionActiveTextEditor();
 }
 
 function startTextEditing(shape, { focus = true, selectAll = false } = {}) {
@@ -3223,6 +3489,157 @@ function repositionActiveTextEditor() {
   active.element.style.height = `${shape.live.height}px`;
   active.element.style.fontFamily = getFontStack(shape.style.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT);
   active.element.style.fontSize = `${Math.max(6, shape.style.fontSize || state.style.fontSize || 32)}px`;
+}
+
+function startLabelEditing(shape, { focus = true, selectAll = false } = {}) {
+  if (!shape || shape.type === "text") return;
+  finalizeActiveTextEditor();
+
+  const editor = document.createElement("input");
+  editor.type = "text";
+  editor.className = "canvas-label-editor";
+  editor.value = shape.label || "";
+  editor.spellcheck = false;
+  editor.autocapitalize = "off";
+  editor.autocomplete = "off";
+  editor.setAttribute("data-shape-id", String(shape.id));
+
+  const pointerBlocker = (event) => {
+    event.stopPropagation();
+  };
+
+  const handleBlur = () => {
+    finalizeActiveLabelEditor();
+  };
+
+  const handleKeydown = (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      finalizeActiveLabelEditor();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      finalizeActiveLabelEditor({ cancel: true });
+    }
+  };
+
+  const handleInput = () => {
+    shape.label = editor.value;
+    render();
+  };
+  
+  const handleWheel = (event) => {
+    event.preventDefault();
+    const delta = event.deltaY > 0 ? -1 : 1;
+    const currentSize = shape.labelSize || 16;
+    const newSize = Math.max(8, Math.min(48, currentSize + delta));
+    shape.labelSize = newSize;
+    repositionActiveLabelEditor();
+    render();
+  };
+
+  editor.addEventListener("pointerdown", pointerBlocker);
+  editor.addEventListener("mousedown", pointerBlocker);
+  editor.addEventListener("blur", handleBlur);
+  editor.addEventListener("keydown", handleKeydown);
+  editor.addEventListener("input", handleInput);
+  editor.addEventListener("wheel", handleWheel);
+
+  document.body.appendChild(editor);
+
+  state.activeLabelEditor = {
+    element: editor,
+    shapeId: shape.id,
+    initialLabel: shape.label || "",
+    handlers: {
+      blur: handleBlur,
+      keydown: handleKeydown,
+      input: handleInput,
+      pointerdown: pointerBlocker,
+      mousedown: pointerBlocker,
+      wheel: handleWheel,
+    },
+  };
+
+  repositionActiveLabelEditor();
+  
+  // Update font controls visibility
+  syncSelectionInputs();
+
+  if (focus) {
+    editor.focus();
+    if (selectAll) {
+      editor.select();
+    }
+  }
+}
+
+function repositionActiveLabelEditor() {
+  const active = state.activeLabelEditor;
+  if (!active || !active.element) return;
+  const shape = state.shapes.find((entry) => entry.id === active.shapeId);
+  if (!shape || shape.type === "text") {
+    destroyActiveLabelEditorElement();
+    return;
+  }
+
+  const center = getShapeCenter(shape);
+  const rect = canvas.getBoundingClientRect();
+  const fontSize = shape.labelSize || 16;
+  const width = 150;
+  const height = 30;
+  
+  const left = rect.left + center.x - width / 2;
+  const top = rect.top + center.y - height / 2;
+  
+  active.element.style.left = `${left}px`;
+  active.element.style.top = `${top}px`;
+  active.element.style.width = `${width}px`;
+  active.element.style.height = `${height}px`;
+  active.element.style.fontSize = `${fontSize}px`;
+  active.element.style.fontFamily = getFontStack(shape.labelFont || DEFAULT_TEXT_FONT);
+  active.element.style.textAlign = "center";
+}
+
+function finalizeActiveLabelEditor({ cancel = false } = {}) {
+  const active = state.activeLabelEditor;
+  if (!active) return;
+
+  const shape = state.shapes.find((entry) => entry.id === active.shapeId);
+  if (shape && !cancel) {
+    shape.label = active.element.value;
+    writeKeyframe(shape);
+    pushHistorySnapshot();
+  } else if (shape && cancel) {
+    shape.label = active.initialLabel;
+  }
+
+  destroyActiveLabelEditorElement();
+  
+  // Update font controls visibility
+  syncSelectionInputs();
+  
+  render();
+}
+
+function destroyActiveLabelEditorElement() {
+  const active = state.activeLabelEditor;
+  if (!active || !active.element) {
+    state.activeLabelEditor = null;
+    return;
+  }
+
+  active.element.removeEventListener("blur", active.handlers.blur);
+  active.element.removeEventListener("keydown", active.handlers.keydown);
+  active.element.removeEventListener("input", active.handlers.input);
+  active.element.removeEventListener("pointerdown", active.handlers.pointerdown);
+  active.element.removeEventListener("mousedown", active.handlers.mousedown);
+  active.element.removeEventListener("wheel", active.handlers.wheel);
+
+  if (active.element.parentNode) {
+    active.element.parentNode.removeChild(active.element);
+  }
+
+  state.activeLabelEditor = null;
 }
 
 function calculateAlignmentGuides(movingShapes, ctrlPressed) {
@@ -3385,6 +3802,9 @@ function moveShape(shape, point, startSnapshot = state.pointer.startSnapshot, sn
   } else {
     shape.live.x = startSnapshot.x + dx;
     shape.live.y = startSnapshot.y + dy;
+    
+    // Update any connected lines
+    updateConnectedLines(shape);
   }
 }
 
@@ -3403,6 +3823,9 @@ function resizeShape(shape, point) {
   } else if (shape.type === "image") {
     resizeRectangularShape(shape, point, start);
   }
+  
+  // Update connected lines after resize
+  updateConnectedLines(shape);
 }
 
 function resizeGroupSelection(point) {
@@ -3636,6 +4059,10 @@ function resizeLineEndpoint(shape, point, mode) {
   } else {
     shape.live.end = { x: point.x, y: point.y };
   }
+  
+  // Update connections
+  updateLineConnections(shape, mode);
+  
   if (shape.type === "line") {
     const snapshot = state.pointer.startSnapshot;
     if (snapshot && snapshot.control && snapshot.start && snapshot.end) {
@@ -3690,6 +4117,9 @@ function rotateShape(shape, point) {
     shape.live.x = center.x - snapshot.width / 2;
     shape.live.y = center.y - snapshot.height / 2;
     shape.style.rotation = radiansToDegrees(shape.live.rotation);
+    
+    // Update connected lines after rotation
+    updateConnectedLines(shape);
   } else if (shape.type === "line" || shape.type === "arrow") {
     shape.live.start = rotatePoint(snapshot.start, center, delta);
     shape.live.end = rotatePoint(snapshot.end, center, delta);
@@ -3782,7 +4212,8 @@ function applyRotationSnapshotToShape(shape, snapshot, center, delta) {
 
 function detectLineEndpointHandle(shape, point) {
   if (shape.type !== "line" && shape.type !== "arrow") return null;
-  const radius = Math.max(12, (shape.style?.strokeWidth || 1) + 6);
+  // Ensure minimum 44px touch target (radius 22px)
+  const radius = Math.max(22, (shape.style?.strokeWidth || 1) + 4);
   if (distance(point, shape.live.start) <= radius) return "start";
   if (distance(point, shape.live.end) <= radius) return "end";
   return null;
@@ -4069,6 +4500,10 @@ function createShape(type, start, end) {
         start: { ...start },
         end: { ...start },
       };
+      shape.connections = {
+        start: null, // { shapeId, point: {x, y} }
+        end: null,   // { shapeId, point: {x, y} }
+      };
       break;
     }
     case "image": {
@@ -4166,7 +4601,7 @@ function isPointInsideShape(shape, point) {
     case "arrow": {
       const { start, end, control } = shape.live || {};
       if (!start || !end) return false;
-      const closeness = shape.type === "line" && control
+      const closeness = control
         ? distanceToQuadratic(point, start, control, end)
         : distanceToSegment(point, start, end);
       return closeness <= Math.max(10, shape.style.strokeWidth + 4);
@@ -7762,6 +8197,14 @@ function applyTimelineState() {
       updateTextMetrics(shape, { preserveOrigin: true });
     }
   });
+  
+  // Update all connected lines after shapes have moved
+  state.shapes.forEach((shape) => {
+    if (shape.type !== "line" && shape.type !== "arrow") {
+      updateConnectedLines(shape);
+    }
+  });
+  
   syncSelectionInputs();
   syncArrowEndingUI();
 }
@@ -8050,7 +8493,10 @@ function syncSelectionInputs() {
   updateStrokeStyleButtonStates(styleSource.strokeStyle ?? state.style.strokeStyle ?? DEFAULT_STROKE_STYLE);
   updateSketchButtonStates(Number(styleSource.sketchLevel ?? 0));
 
-  const showFontControls = selectionType === "text" || (!useSelectionStyle && state.tool === "text");
+  const showFontControls = selectionType === "text" || 
+    (!useSelectionStyle && state.tool === "text") || 
+    state.activeLabelEditor ||
+    (state.selection && state.selection.label);
   if (elements.fontFamilyControl) {
     elements.fontFamilyControl.classList.toggle("is-hidden", !showFontControls);
     if (!showFontControls) {
@@ -8088,7 +8534,15 @@ function syncSelectionInputs() {
   }
 
   if (elements.fontFamily) {
-    const fontValue = styleSource.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT;
+    let fontValue;
+    if (state.activeLabelEditor) {
+      const labelShape = state.shapes.find((s) => s.id === state.activeLabelEditor.shapeId);
+      fontValue = labelShape?.labelFont || DEFAULT_TEXT_FONT;
+    } else if (state.selection && state.selection.label && state.selection.type !== "text") {
+      fontValue = state.selection.labelFont || DEFAULT_TEXT_FONT;
+    } else {
+      fontValue = styleSource.fontFamily || state.style.fontFamily || DEFAULT_TEXT_FONT;
+    }
     const options = Array.from(elements.fontFamily.options || []);
     const hasOption = options.some((option) => option.value === fontValue);
     elements.fontFamily.value = hasOption ? fontValue : DEFAULT_TEXT_FONT;
@@ -8923,6 +9377,111 @@ function getShapeRotation(shape) {
   return 0;
 }
 
+const CONNECTION_SNAP_DISTANCE = 20;
+
+function findNearbyShape(point, excludeShape) {
+  const snapDistance = CONNECTION_SNAP_DISTANCE;
+  for (let i = state.shapes.length - 1; i >= 0; i--) {
+    const shape = state.shapes[i];
+    if (shape === excludeShape) continue;
+    if (shape.type === "line" || shape.type === "arrow") continue;
+    if (!shape.isVisible) continue;
+    
+    const center = getShapeCenter(shape);
+    const dist = distance(point, center);
+    
+    if (shape.type === "circle") {
+      const radius = shape.live.width / 2;
+      if (dist <= radius + snapDistance) {
+        return { shape, point: center };
+      }
+    } else if (isPointInsideShape(shape, point) || dist <= snapDistance) {
+      return { shape, point: center };
+    }
+  }
+  return null;
+}
+
+function updateLineConnections(line, mode) {
+  if (!line || (line.type !== "line" && line.type !== "arrow")) return;
+  if (!line.connections) {
+    line.connections = { start: null, end: null };
+  }
+  
+  const endpoint = mode === "resizing-line-start" ? "start" : "end";
+  const point = line.live[endpoint];
+  
+  const nearby = findNearbyShape(point, line);
+  if (nearby) {
+    // Store the exact point where the user placed the arrow, not the shape center
+    line.connections[endpoint] = {
+      shapeId: nearby.shape.id,
+      point: { x: point.x, y: point.y },
+      offset: {
+        x: point.x - nearby.point.x,
+        y: point.y - nearby.point.y,
+      },
+    };
+  } else {
+    line.connections[endpoint] = null;
+  }
+}
+
+function updateConnectedLines(movedShape) {
+  if (!movedShape) return;
+  
+  const movedCenter = getShapeCenter(movedShape);
+  const rotation = getShapeRotation(movedShape);
+  
+  state.shapes.forEach((shape) => {
+    if (shape.type !== "line" && shape.type !== "arrow") return;
+    if (!shape.connections) return;
+    
+    let updated = false;
+    
+    if (shape.connections.start && shape.connections.start.shapeId === movedShape.id) {
+      // Apply the stored offset to the new center position, with rotation
+      const offset = shape.connections.start.offset || { x: 0, y: 0 };
+      const rotatedOffset = rotateVector(offset, rotation);
+      shape.live.start = {
+        x: movedCenter.x + rotatedOffset.x,
+        y: movedCenter.y + rotatedOffset.y,
+      };
+      shape.connections.start.point = { ...shape.live.start };
+      updated = true;
+    }
+    
+    if (shape.connections.end && shape.connections.end.shapeId === movedShape.id) {
+      // Apply the stored offset to the new center position, with rotation
+      const offset = shape.connections.end.offset || { x: 0, y: 0 };
+      const rotatedOffset = rotateVector(offset, rotation);
+      shape.live.end = {
+        x: movedCenter.x + rotatedOffset.x,
+        y: movedCenter.y + rotatedOffset.y,
+      };
+      shape.connections.end.point = { ...shape.live.end };
+      updated = true;
+    }
+    
+    if (updated && shape.live.control) {
+      const offset = getLineBendOffset(shape.live.start, shape.live.end, shape.live.control);
+      shape.live.control = getLineControlFromOffset(shape.live.start, shape.live.end, offset);
+    }
+  });
+}
+
+function getConnectionHighlightShape() {
+  if (!state.pointer.mode) return null;
+  if (state.pointer.mode !== "resizing-line-start" && state.pointer.mode !== "resizing-line-end") return null;
+  if (!state.selection || (state.selection.type !== "line" && state.selection.type !== "arrow")) return null;
+  
+  const endpoint = state.pointer.mode === "resizing-line-start" ? "start" : "end";
+  const point = state.selection.live[endpoint];
+  const nearby = findNearbyShape(point, state.selection);
+  
+  return nearby ? nearby.shape : null;
+}
+
 function getCanvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
   let clientX = 0;
@@ -9005,7 +9564,18 @@ async function handleExportGif() {
   const fps = state.timeline.exportFps || 25;
   const duration = Math.max(0, state.timeline.duration);
   const maxFrames = 600;
+  const maxDuration = 120;
   const step = fps > 0 ? 1 / fps : 0.1;
+
+  if (duration > maxDuration) {
+    const proceed = window.confirm(
+      `Timeline duration is ${duration}s, which exceeds the recommended ${maxDuration}s maximum for exports.\n\n` +
+      `Only the first ${maxDuration}s will be exported. Continue?`
+    );
+    if (!proceed) return;
+  }
+
+  const clampedDuration = Math.min(duration, maxDuration);
 
   updateExportStatus("Capturing frames…", "info");
 
@@ -9021,7 +9591,7 @@ async function handleExportGif() {
   const frames = [];
   let time = 0;
   let direction = 1;
-  const targetFrames = duration === 0 ? 1 : Math.max(1, Math.ceil(duration * fps));
+  const targetFrames = clampedDuration === 0 ? 1 : Math.max(1, Math.ceil(clampedDuration * fps));
   const plannedFrames = Math.max(1, Math.min(maxFrames, originalBounce ? targetFrames * 2 : targetFrames));
 
   for (let index = 0; index < plannedFrames; index += 1) {
@@ -9033,14 +9603,14 @@ async function handleExportGif() {
       delayMs: Math.max(20, Math.round(1000 / Math.max(1, fps))),
     });
 
-    if (duration === 0) {
+    if (clampedDuration === 0) {
       continue;
     }
 
     time += step * direction;
     if (originalBounce) {
-      if (time >= duration) {
-        time = duration;
+      if (time >= clampedDuration) {
+        time = clampedDuration;
         direction = -1;
       } else if (time <= 0) {
         time = 0;
@@ -9090,12 +9660,23 @@ async function handleExportGif() {
 async function handleExportMp4() {
   const fps = state.timeline.exportFps || 25;
   const duration = Math.max(0, state.timeline.duration);
+  const maxDuration = 120;
 
   if (duration === 0) {
     updateExportStatus("Single static frame – video not exported", "error");
     alert("MP4 export requires animation with duration > 0.");
     return;
   }
+
+  if (duration > maxDuration) {
+    const proceed = window.confirm(
+      `Timeline duration is ${duration}s, which exceeds the recommended ${maxDuration}s maximum for exports.\n\n` +
+      `Only the first ${maxDuration}s will be exported. Continue?`
+    );
+    if (!proceed) return;
+  }
+
+  const clampedDuration = Math.min(duration, maxDuration);
 
   // Check if MediaRecorder is supported
   if (!window.MediaRecorder || !MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
@@ -9139,7 +9720,7 @@ async function handleExportMp4() {
     // For loop mode, capture 3 iterations to show the loop effect (since MP4 doesn't support native looping)
     // For bounce mode, capture one complete bounce (forward + backward)
     const loopMultiplier = originalLoop ? 3 : 1;
-    const animationDuration = originalBounce ? duration * 2 : duration * loopMultiplier;
+    const animationDuration = originalBounce ? clampedDuration * 2 : clampedDuration * loopMultiplier;
     const pauseDuration = 1.0; // 1 second pause at the end
     const targetDuration = animationDuration + pauseDuration;
 
@@ -9159,26 +9740,26 @@ async function handleExportMp4() {
         // Animate normally until we reach the animation duration
         if (originalBounce) {
           // For bounce mode, map the elapsed time to bounce back and forth
-          if (time <= duration) {
+          if (time <= clampedDuration) {
             // Forward phase
             time = time;
           } else {
             // Backward phase
-            time = duration - (time - duration);
+            time = clampedDuration - (time - clampedDuration);
           }
         } else if (originalLoop) {
           // For loop mode, wrap the time
-          time = time % duration;
+          time = time % clampedDuration;
         } else {
           // For normal mode, clamp to duration
-          time = Math.min(time, duration);
+          time = Math.min(time, clampedDuration);
         }
       } else {
         // During the pause, hold at the final frame
         if (originalBounce) {
           time = 0; // Bounce ends at start
         } else {
-          time = duration; // Normal/loop ends at duration
+          time = clampedDuration; // Normal/loop ends at duration
         }
       }
 
@@ -9243,6 +9824,18 @@ function cloneShape(shape) {
     isVisible: shape.isVisible !== false,
     groupId: shape.groupId ?? null,
   };
+  if (shape.label) {
+    clone.label = shape.label;
+  }
+  if (shape.labelFont) {
+    clone.labelFont = shape.labelFont;
+  }
+  if (shape.labelSize) {
+    clone.labelSize = shape.labelSize;
+  }
+  if (shape.connections) {
+    clone.connections = JSON.parse(JSON.stringify(shape.connections));
+  }
   if (shape.asset && shape.asset.source) {
     clone.asset = {
       source: shape.asset.source,
@@ -9458,6 +10051,24 @@ function applyImportedScene(payload) {
         source: entry.asset.source,
       };
       rehydrateShapeAsset(shape);
+    }
+    
+    if (entry.label) {
+      shape.label = entry.label;
+    }
+    
+    if (entry.labelFont) {
+      shape.labelFont = entry.labelFont;
+    }
+    
+    if (entry.labelSize) {
+      shape.labelSize = entry.labelSize;
+    }
+    
+    if ((targetType === "line" || targetType === "arrow") && entry.connections) {
+      shape.connections = JSON.parse(JSON.stringify(entry.connections));
+    } else if (targetType === "line" || targetType === "arrow") {
+      shape.connections = { start: null, end: null };
     }
 
     return shape;
@@ -9807,6 +10418,12 @@ function createAnimatorApi() {
         state.timeline.lastTick = postLastTick ?? previousLastTick;
       }
       return result;
+    },
+    getShapes() {
+      return state.shapes.map(shape => ({ ...shape }));
+    },
+    exportScene() {
+      return buildSceneExportPayload();
     },
     captureTimelineFrames,
   };

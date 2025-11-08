@@ -53,12 +53,10 @@
                 title="Hide the toolbar"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
-                  <path d="M14 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                  <path d="M18 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                  <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
-                  <path d="M10 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                  <path d="M6 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                  <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                 </svg>
               </button>
             </div>
@@ -227,23 +225,6 @@
         </aside>
 
         <section class="stage-area">
-          <button
-            type="button"
-            class="toolbar-toggle toolbar-toggle-floating icon-only"
-            data-toolbar-toggle
-            aria-pressed="false"
-            aria-label="Show toolbar"
-            title="Show the toolbar"
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
-              <path d="M15 5l-6 7 6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-              <path d="M19 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-            </svg>
-            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
-              <path d="M9 5l6 7-6 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-              <path d="M5 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-            </svg>
-          </button>
           <div class="canvas-wrapper">
             <div class="floating-tool-menu" aria-label="Canvas tools and actions">
               <div class="tool-cluster" role="radiogroup" aria-label="Shape tools">
@@ -339,6 +320,23 @@
               </button>
             </div>
             <div class="stage-surface">
+              <div class="floating-toolbar-menu">
+                <button
+                  type="button"
+                  class="toolbar-toggle toolbar-toggle-floating icon-only"
+                  data-toolbar-toggle
+                  aria-pressed="false"
+                  aria-label="Show toolbar"
+                  title="Show the toolbar"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
+                    <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
+                    <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
+              </div>
               <canvas id="stage" width="1280" height="720" role="application" aria-label="Animation canvas"></canvas>
               <div id="stageDimensions" class="stage-dimensions" aria-live="polite">1280 × 720 px</div>
               <div class="zoom-controls">
@@ -366,34 +364,56 @@
                   <path d="M11 19l8-8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
                 </svg>
               </button>
-              <button type="button" class="stage-resize-handle stage-resize-handle--right" data-stage-resize="right" aria-label="Resize canvas width" title="Drag to adjust canvas width">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M10 6l4 6-4 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M6 12h12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-                </svg>
-              </button>
-              <button type="button" class="stage-resize-handle stage-resize-handle--bottom" data-stage-resize="bottom" aria-label="Resize canvas height" title="Drag to adjust canvas height">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M6 10l6 4 6-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-                  <path d="M12 6v12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-                </svg>
-              </button>
               <div id="marqueeOverlay" class="marquee-overlay" hidden aria-hidden="true"></div>
+              <div class="floating-timeline-menu">
+                <button
+                  type="button"
+                  class="toolbar-toggle timeline-toggle-floating icon-only"
+                  data-timeline-toggle
+                  aria-pressed="false"
+                  aria-label="Show timeline"
+                  title="Show the timeline"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
+                    <path d="M18 15l-6-6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
+                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
 
           <section class="timeline" aria-label="Animation timeline">
             <header class="timeline-header">
               <div class="timeline-controls">
-                <button id="playToggle" class="primary" title="Play or pause the animation">Play</button>
-                <button id="stopPlayback" class="ghost" title="Stop playback and reset">Stop</button>
-                <button id="addKeyframe" class="ghost" disabled title="Add a keyframe at the current time">Add keyframe</button>
-                <button id="deleteKeyframe" class="ghost" disabled title="Delete keyframe at the current time">Delete keyframe</button>
+                <div class="timeline-controls-left">
+                  <button id="playToggle" class="primary" title="Play or pause the animation">Play</button>
+                  <button id="stopPlayback" class="ghost" title="Stop playback and reset">Stop</button>
+                  <button id="addKeyframe" class="ghost" disabled title="Add a keyframe at the current time">Add keyframe</button>
+                  <button id="deleteKeyframe" class="ghost" disabled title="Delete keyframe at the current time">Delete keyframe</button>
+                </div>
+                <button
+                  type="button"
+                  class="toolbar-toggle timeline-toggle icon-only"
+                  data-timeline-toggle
+                  aria-pressed="false"
+                  aria-label="Hide timeline"
+                  title="Hide the timeline"
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
+                    <path d="M18 15l-6-6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
+                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                </button>
               </div>
               <div class="timeline-info">
                 <label class="control compact">
                   <span>Duration</span>
-                  <input type="number" id="timelineDuration" min="1" max="120" value="5" title="Change the animation duration" />
+                  <input type="number" id="timelineDuration" min="1" value="5" title="Change the animation duration" />
                   <span class="suffix">s</span>
                 </label>
                 <label class="toggle-checkbox" id="loopToggleLabel">

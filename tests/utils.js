@@ -102,15 +102,23 @@ async function dispatchMouseEvent(
   );
 }
 
-async function pointerDrag(page, startX, startY, endX, endY, { steps = 12, pointerId = 1 } = {}) {
-  await dispatchPointerEvent(page, 'pointerdown', startX, startY, { pointerId });
+async function pointerDrag(page, startX, startY, endX, endY, { 
+  steps = 12, 
+  pointerId = 1, 
+  ctrlKey = false, 
+  shiftKey = false, 
+  metaKey = false, 
+  altKey = false 
+} = {}) {
+  const modifiers = { pointerId, ctrlKey, shiftKey, metaKey, altKey };
+  await dispatchPointerEvent(page, 'pointerdown', startX, startY, modifiers);
   for (let i = 1; i <= steps; i += 1) {
     const progress = i / steps;
     const currentX = startX + (endX - startX) * progress;
     const currentY = startY + (endY - startY) * progress;
-    await dispatchPointerEvent(page, 'pointermove', currentX, currentY, { pointerId });
+    await dispatchPointerEvent(page, 'pointermove', currentX, currentY, modifiers);
   }
-  await dispatchPointerEvent(page, 'pointerup', endX, endY, { pointerId });
+  await dispatchPointerEvent(page, 'pointerup', endX, endY, modifiers);
 }
 
 async function mouseDrag(page, startX, startY, endX, endY, { steps = 12 } = {}) {
