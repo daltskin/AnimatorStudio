@@ -4211,7 +4211,8 @@ function applyRotationSnapshotToShape(shape, snapshot, center, delta) {
 
 function detectLineEndpointHandle(shape, point) {
   if (shape.type !== "line" && shape.type !== "arrow") return null;
-  const radius = Math.max(10, (shape.style?.strokeWidth || 1) + 4);
+  // Ensure minimum 44px touch target (radius 22px)
+  const radius = Math.max(22, (shape.style?.strokeWidth || 1) + 4);
   if (distance(point, shape.live.start) <= radius) return "start";
   if (distance(point, shape.live.end) <= radius) return "end";
   return null;
