@@ -11,7 +11,6 @@ test.describe("Mobile Responsive Design", () => {
     await page.waitForSelector("#stage");
 
     const toolbar = page.locator(".toolbar");
-    const appShell = page.locator(".app-shell");
 
     // On mobile, toolbar should be static positioned (not floating)
     const toolbarStyle = await toolbar.evaluate((el) => {
