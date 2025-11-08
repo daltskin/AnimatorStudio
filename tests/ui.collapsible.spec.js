@@ -16,7 +16,6 @@ test.describe("Collapsible UI Elements", () => {
 
     // Click toolbar toggle to collapse
     await page.locator(".toolbar .toolbar-toggle").first().click();
-    await page.waitForTimeout(400);
 
     // Toolbar should be hidden, floating toggle visible
     await expect(toolbar).not.toBeVisible();
@@ -24,7 +23,6 @@ test.describe("Collapsible UI Elements", () => {
 
     // Click floating toggle to restore
     await floatingToggle.click();
-    await page.waitForTimeout(400);
 
     await expect(toolbar).toBeVisible();
     await expect(floatingToggle).not.toBeVisible();
@@ -33,7 +31,6 @@ test.describe("Collapsible UI Elements", () => {
   test("toolbar collapse state persists across page reload", async ({ page }) => {
     // Collapse toolbar
     await page.locator(".toolbar .toolbar-toggle").first().click();
-    await page.waitForTimeout(400);
 
     const floatingToggle = page.locator(".floating-toolbar-menu .toolbar-toggle-floating");
     await expect(floatingToggle).toBeVisible();
@@ -57,7 +54,6 @@ test.describe("Collapsible UI Elements", () => {
 
     // Collapse tool menu
     await toolMenuToggle.click();
-    await page.waitForTimeout(200);
 
     // Tools should be hidden
     await expect(page.locator(".tool-button[data-tool='rectangle']")).not.toBeVisible();
@@ -65,7 +61,6 @@ test.describe("Collapsible UI Elements", () => {
 
     // Expand again
     await toolMenuToggle.click();
-    await page.waitForTimeout(200);
 
     await expect(page.locator(".tool-button[data-tool='rectangle']")).toBeVisible();
   });
@@ -80,7 +75,6 @@ test.describe("Collapsible UI Elements", () => {
 
     // Collapse timeline
     await page.locator(".timeline .timeline-toggle").click();
-    await page.waitForTimeout(400);
 
     // Timeline hidden, floating toggle visible
     await expect(timeline).not.toBeVisible();
@@ -88,22 +82,20 @@ test.describe("Collapsible UI Elements", () => {
 
     // Restore timeline
     await floatingTimelineToggle.click();
-    await page.waitForTimeout(400);
 
     await expect(timeline).toBeVisible();
     await expect(floatingTimelineToggle).not.toBeVisible();
   });
 
   test("all three floating buttons have consistent styling", async ({ page }) => {
+    const toolMenuToggle = page.locator("[data-tool-menu-toggle]");
+    const toolbarToggle = page.locator(".floating-toolbar-menu .toolbar-toggle-floating");
+    const timelineToggle = page.locator(".floating-timeline-menu .timeline-toggle-floating");
+
     // Collapse all UI elements
     await page.locator(".toolbar .toolbar-toggle").first().click();
     await page.locator("[data-tool-menu-toggle]").click();
     await page.locator(".timeline .timeline-toggle").click();
-    await page.waitForTimeout(500);
-
-    const toolMenuToggle = page.locator("[data-tool-menu-toggle]");
-    const toolbarToggle = page.locator(".floating-toolbar-menu .toolbar-toggle-floating");
-    const timelineToggle = page.locator(".floating-timeline-menu .timeline-toggle-floating");
 
     // All should be visible
     await expect(toolMenuToggle).toBeVisible();
@@ -127,8 +119,9 @@ test.describe("Collapsible UI Elements", () => {
     // Expand tool menu (if collapsed)
     const toolMenuState = await page.locator(".floating-tool-menu").getAttribute("data-collapsed");
     if (toolMenuState === "true") {
+      const rectangleButton = page.locator(".tool-button[data-tool='rectangle']");
       await page.locator("[data-tool-menu-toggle]").click();
-      await page.waitForTimeout(200);
+      await expect(rectangleButton).toBeVisible();
     }
 
     const expandedBox = await canvas.boundingBox();
@@ -140,11 +133,12 @@ test.describe("Collapsible UI Elements", () => {
 
   test("collapsing UI elements gives more canvas space", async ({ page }) => {
     const stageArea = page.locator(".stage-area");
+    const toolbar = page.locator(".toolbar");
     const initialBox = await stageArea.boundingBox();
 
     // Collapse toolbar
     await page.locator(".toolbar .toolbar-toggle").first().click();
-    await page.waitForTimeout(400);
+    await expect(toolbar).not.toBeVisible();
 
     const collapsedBox = await stageArea.boundingBox();
 
@@ -158,7 +152,6 @@ test.describe("Collapsible UI Elements", () => {
     
     // Hover over tool button
     await toolButton.hover();
-    await page.waitForTimeout(100);
 
     // Visual regression would be ideal here, but checking they don't throw errors
     const toolButtonStyle = await toolButton.evaluate((el) => {
