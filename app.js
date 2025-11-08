@@ -858,6 +858,7 @@ const MARQUEE_EPSILON = 0.5;
 function init() {
   restoreToolbarCollapsedPreference();
   restoreToolMenuCollapsedPreference();
+  applyTimelineCollapsedState({ scheduleResize: false });
   resizeCanvas();
   bindEvents();
   initializeTipsPanel();
@@ -8407,7 +8408,7 @@ function setTimelineTime(time, { apply = false } = {}) {
 function applyTimelineDuration(value) {
   const numeric = Number(value);
   const candidate = Number.isFinite(numeric) ? numeric : state.timeline.duration;
-  const clamped = Math.max(1, candidate);
+  const clamped = Math.max(1, Math.min(120, candidate));
   state.timeline.duration = clamped;
   if (elements.timelineDuration) {
     elements.timelineDuration.value = String(clamped);
@@ -10417,6 +10418,12 @@ function createAnimatorApi() {
         state.timeline.lastTick = postLastTick ?? previousLastTick;
       }
       return result;
+    },
+    getShapes() {
+      return state.shapes.map(shape => ({ ...shape }));
+    },
+    exportScene() {
+      return buildSceneExportPayload();
     },
     captureTimelineFrames,
   };

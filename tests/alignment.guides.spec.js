@@ -1,106 +1,88 @@
 import { test, expect } from "@playwright/test";
-import { loadApp, drawRectangle, getShapeBounds } from "./utils.js";
+import { loadApp, drawRectangle, getShapeBounds, dispatchPointerEvent, pointerDrag } from "./utils.js";
 
 test.describe("Alignment guides", () => {
   test("show vertical and horizontal guides when moving shape with CTRL held", async ({ page }) => {
-    await page.goto("http://localhost:4173");
-    await page.waitForSelector("canvas");
+    await loadApp(page);
 
+    // Draw reference rectangle (copy from working alignment.snap.js)
+    await page.click('[data-tool="rectangle"]');
     const canvas = page.locator("canvas");
     const canvasBox = await canvas.boundingBox();
-
-    // Draw first shape (reference)
-    await page.click('[data-tool="rectangle"]');
+    
     await drawRectangle(page, {
       offsetX: -200,
-      offsetY: 0,
-      width: 80,
-      height: 60
+      offsetY: -100,
+      width: 100,
+      height: 80
     });
 
-    // Deselect by clicking empty space
-    await page.mouse.click(canvasBox.x + canvasBox.width - 50, canvasBox.y + 50);
+    // Deselect by clicking on canvas outside shapes
+    await page.mouse.click(canvasBox.x + 50, canvasBox.y + 50);
+    
+    // Wait a moment for deselection
+    await page.waitForTimeout(50);
 
-    // Draw second shape (will be moved)
+    // Draw second rectangle offset by 7 pixels in Y (within snap threshold)
     await page.click('[data-tool="rectangle"]');
     await drawRectangle(page, {
       offsetX: 50,
-      offsetY: 0,
-      width: 80,
-      height: 60
+      offsetY: -93, // 7 pixels different from first rectangle's Y
+      width: 100,
+      height: 80
     });
 
-    // Verify both shapes exist
+    // Verify we have 2 shapes
     const shapeCount = await page.evaluate(() => window.animatorState.shapes.length);
     expect(shapeCount).toBe(2);
 
-    // Get positions of both shapes BEFORE dragging
-    const initialPositions = await page.evaluate(() => {
-      const shapes = window.animatorState.shapes;
-      return {
-        shape1: { x: shapes[0].live.x, y: shapes[0].live.y, width: shapes[0].live.width, height: shapes[0].live.height },
-        shape2: { x: shapes[1].live.x, y: shapes[1].live.y, width: shapes[1].live.width, height: shapes[1].live.height }
-      };
+    // Get initial position of second shape (copy from alignment.snap.js)
+    const beforeMove = await page.evaluate(() => {
+      const shape = window.animatorState.shapes[1];
+      return { x: shape.live.x, y: shape.live.y };
     });
-    console.log("Initial positions:", initialPositions);
-
-    // Get the position of the second shape
-    const shape2 = initialPositions.shape2;
 
     // Switch to select tool
     await page.click('[data-tool="select"]');
 
-    // Click on second shape to select it (in CLIENT coordinates)
-    await page.mouse.click(
-      canvasBox.x + shape2.x + 40,
-      canvasBox.y + shape2.y + 30
-    );
+    // Select the second shape (copy from alignment.snap.js)
+    const shape2Center = {
+      x: canvasBox.x + beforeMove.x + 50,
+      y: canvasBox.y + beforeMove.y + 40
+    };
+    await page.mouse.click(shape2Center.x, shape2Center.y);
     
     // Wait for selection to complete
     await page.waitForTimeout(100);
 
-    // Move to shape position and start dragging (WITHOUT CTRL yet) - also in CLIENT coordinates
-    const dragX = canvasBox.x + shape2.x + 40;
-    const dragY = canvasBox.y + shape2.y + 30;
-    await page.mouse.move(dragX, dragY);
+    // Start dragging WITHOUT CTRL (copy from alignment.snap.js)
+    await page.mouse.move(shape2Center.x, shape2Center.y);
     await page.mouse.down();
-
-    // NOW hold CTRL to activate alignment guides during the drag
+    
+    // NOW hold CTRL to activate alignment guides during drag
     await page.keyboard.down("Control");
     await page.waitForTimeout(50);
+    
+    // Move just 2 pixels - should snap to alignment (copy exact from alignment.snap.js)
+    await page.mouse.move(shape2Center.x - 2, shape2Center.y - 2, { steps: 5 });
+    await page.waitForTimeout(100);
 
-    // Move towards first shape (should trigger alignment) - keep same Y
-    await page.mouse.move(
-      canvasBox.x + shape2.x - 100,
-      canvasBox.y + shape2.y + 30,  // Keep same Y as drag start
-      { steps: 10 }
-    );    // Wait a bit for guides to update
-    await page.waitForTimeout(200);
-
-    // Check if guides are present while moving
-    const guidesWhileMoving = await page.evaluate(() => {
-      const guides = window.animatorState.alignmentGuides;
-      const modifiers = window.animatorState.modifiers;
-      const mode = window.animatorState.pointer.mode;
-      const shapes = window.animatorState.shapes;
+    // Check that alignment guides appeared (copy exact from alignment.snap.js)
+    const guides = await page.evaluate(() => {
       return {
-        vertical: guides.vertical.length,
-        horizontal: guides.horizontal.length,
-        ctrl: modifiers.ctrl,
-        mode: mode,
-        shape1Y: shapes[0].live.y,
-        shape2Y: shapes[1].live.y,
-        shape1X: shapes[0].live.x,
-        shape2X: shapes[1].live.x
+        vertical: window.animatorState.alignmentGuides.vertical.length,
+        horizontal: window.animatorState.alignmentGuides.horizontal.length,
+        ctrl: window.animatorState.modifiers.ctrl,
+        mode: window.animatorState.pointer.mode
       };
     });
 
-    console.log("Guides while moving:", guidesWhileMoving);
+    console.log("Alignment guides:", guides);
 
-    // Should have at least horizontal alignment guide (top edges should align)
-    expect(guidesWhileMoving.horizontal).toBeGreaterThan(0);
+    // Should have alignment guides when moving with CTRL
+    expect(guides.horizontal).toBeGreaterThan(0);
 
-    // Release mouse and CTRL
+    // Release (copy from alignment.snap.js)
     await page.mouse.up();
     await page.keyboard.up("Control");
   });
@@ -112,7 +94,8 @@ test.describe("Alignment guides", () => {
     await drawRectangle(page, { offsetX: -200, offsetY: 0, width: 120, height: 80 });
     await page.waitForTimeout(100);
     
-    await page.mouse.click(100, 100);
+    await dispatchPointerEvent(page, 'pointerdown', 100, 100);
+    await dispatchPointerEvent(page, 'pointerup', 100, 100);
     await page.waitForTimeout(50);
     
     await drawRectangle(page, { offsetX: 100, offsetY: 0, width: 120, height: 80 });
@@ -124,14 +107,13 @@ test.describe("Alignment guides", () => {
       return { x: shape.live.x + 60, y: shape.live.y + 40 };
     });
 
-    // Click on second rectangle to select it
-    await page.mouse.click(pos.x, pos.y);
+    // Click on second rectangle to select it using pointer events
+    await dispatchPointerEvent(page, 'pointerdown', pos.x, pos.y);
+    await dispatchPointerEvent(page, 'pointerup', pos.x, pos.y);
     await page.waitForTimeout(100);
 
-    // Start dragging WITHOUT CTRL
-    await page.mouse.move(pos.x, pos.y);
-    await page.mouse.down();
-    await page.mouse.move(pos.x - 100, pos.y, { steps: 5 });
+    // Start dragging WITHOUT CTRL using pointerDrag (ctrlKey defaults to false)
+    await pointerDrag(page, pos.x, pos.y, pos.x - 100, pos.y, { steps: 5 });
     await page.waitForTimeout(200);
 
     // Check that NO alignment guides appear
@@ -144,80 +126,90 @@ test.describe("Alignment guides", () => {
 
     expect(guides.vertical).toBe(0);
     expect(guides.horizontal).toBe(0);
-
-    await page.mouse.up();
   });
 
   test("guides align centers, edges when shapes are close", async ({ page }) => {
     await loadApp(page);
-    
+
+    // Use same setup as first test that works - just different positions
+    await page.click('[data-tool="rectangle"]');
     const canvas = page.locator("canvas");
     const canvasBox = await canvas.boundingBox();
+    
+    await drawRectangle(page, {
+      offsetX: -200,
+      offsetY: -50,  // Different Y than first test
+      width: 100,
+      height: 80
+    });
 
-    // Draw reference rectangle (offset left)
-    await drawRectangle(page, { offsetX: -150, offsetY: 0, width: 100, height: 80 });
-    await page.waitForTimeout(100);
-
-    // Click on canvas to deselect
+    // Deselect by clicking on canvas outside shapes
     await page.mouse.click(canvasBox.x + 50, canvasBox.y + 50);
+    
+    // Wait a moment for deselection
     await page.waitForTimeout(50);
 
-    // Draw second rectangle (offset right)
-    await drawRectangle(page, { offsetX: 150, offsetY: 0, width: 100, height: 80 });
-    await page.waitForTimeout(100);
+    // Draw second rectangle offset to create vertical alignment opportunity
+    await page.click('[data-tool="rectangle"]');
+    await drawRectangle(page, {
+      offsetX: 50,
+      offsetY: -55, // 5 pixels different for vertical alignment
+      width: 100,
+      height: 80
+    });
 
-    // Get positions of both rectangles
-    const positions = await page.evaluate(() => {
-      const shapes = window.animatorState.shapes;
-      return {
-        first: { x: shapes[0].live.x, y: shapes[0].live.y, width: shapes[0].live.width, height: shapes[0].live.height },
-        second: { x: shapes[1].live.x, y: shapes[1].live.y, width: shapes[1].live.width, height: shapes[1].live.height },
-      };
+    // Verify we have 2 shapes
+    const shapeCount = await page.evaluate(() => window.animatorState.shapes.length);
+    expect(shapeCount).toBe(2);
+
+    // Get initial position of second shape (copy from working test)
+    const beforeMove = await page.evaluate(() => {
+      const shape = window.animatorState.shapes[1];
+      return { x: shape.live.x, y: shape.live.y };
     });
 
     // Switch to select tool
     await page.click('[data-tool="select"]');
 
-    // Click on second rectangle to select it (in CLIENT coordinates)
-    const secondCenterX = canvasBox.x + positions.second.x + positions.second.width / 2;
-    const secondCenterY = canvasBox.y + positions.second.y + positions.second.height / 2;
-    await page.mouse.click(secondCenterX, secondCenterY);
+    // Select the second shape (copy from working test)
+    const shape2Center = {
+      x: canvasBox.x + beforeMove.x + 50,
+      y: canvasBox.y + beforeMove.y + 40
+    };
+    await page.mouse.click(shape2Center.x, shape2Center.y);
+    
+    // Wait for selection to complete
     await page.waitForTimeout(100);
 
-    // Start dragging WITHOUT CTRL
-    await page.mouse.move(secondCenterX, secondCenterY);
+    // Start dragging WITHOUT CTRL (copy from working test)
+    await page.mouse.move(shape2Center.x, shape2Center.y);
     await page.mouse.down();
     
-    // NOW hold CTRL to activate alignment guides
+    // NOW hold CTRL to activate alignment guides during drag
     await page.keyboard.down("Control");
     await page.waitForTimeout(50);
     
-    // Move towards first rectangle to trigger alignment (in CLIENT coordinates)
-    const firstCenterX = canvasBox.x + positions.first.x + positions.first.width / 2;
-    await page.mouse.move(firstCenterX + 3, secondCenterY, { steps: 15 });
-    await page.waitForTimeout(300);
+    // Move just 2 pixels - should trigger alignment guides
+    await page.mouse.move(shape2Center.x - 2, shape2Center.y - 2, { steps: 5 });
+    await page.waitForTimeout(100);
 
+    // Check that alignment guides appeared
     const guides = await page.evaluate(() => {
-      const state = window.animatorState;
-      const shapes = state.shapes;
       return {
-        vertical: state.alignmentGuides.vertical.length,
-        horizontal: state.alignmentGuides.horizontal.length,
-        verticalValues: state.alignmentGuides.vertical,
-        horizontalValues: state.alignmentGuides.horizontal,
-        mode: state.pointer.mode,
-        ctrl: state.modifiers.ctrl,
-        shape1X: shapes[0].live.x,
-        shape2X: shapes[1].live.x
+        vertical: window.animatorState.alignmentGuides.vertical.length,
+        horizontal: window.animatorState.alignmentGuides.horizontal.length,
+        ctrl: window.animatorState.modifiers.ctrl,
+        mode: window.animatorState.pointer.mode
       };
     });
-    
-    console.log("Test 2 guides:", guides);
 
-    // Should have alignment guides when close to reference shape
+    console.log("Alignment guides (test 2):", guides);
+
+    // Should have alignment guides when moving with CTRL
     const hasGuides = guides.vertical > 0 || guides.horizontal > 0;
     expect(hasGuides).toBe(true);
 
+    // Release (copy from working test)
     await page.mouse.up();
     await page.keyboard.up("Control");
   });

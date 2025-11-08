@@ -235,6 +235,7 @@ body {
 }
 
 .app-shell.toolbar-collapsed .workspace {
+  padding-left: 0;
 }
 
 .app-shell.toolbar-collapsed .toolbar {
@@ -1194,12 +1195,12 @@ button.danger:disabled {
 }
 
 .app-shell.timeline-collapsed .floating-timeline-menu {
-  opacity: 1;
+  visibility: visible;
   pointer-events: auto;
 }
 
 .app-shell:not(.timeline-collapsed) .floating-timeline-menu {
-  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
@@ -1571,6 +1572,10 @@ button.danger:disabled {
     right: 0.5rem;
   }
 
+  .app-shell.timeline-collapsed .zoom-controls {
+    bottom: 5rem;
+  }
+
   .zoom-button {
     width: 2.75rem;
     height: 2.75rem;
@@ -1735,6 +1740,10 @@ button.danger:disabled {
   .zoom-controls {
     bottom: 6rem;
     right: 0.35rem;
+  }
+
+  .app-shell.timeline-collapsed .zoom-controls {
+    bottom: 5rem;
   }
 
   .zoom-button {

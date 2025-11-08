@@ -1,30 +1,19 @@
 const { test, expect } = require("@playwright/test");
-const { loadApp } = require("./utils.js");
+const { loadApp, drawRectangle, drawCircle, drawLine, pointerDrag, setTool } = require("./utils.js");
 
 test.describe("Drawing over shapes", () => {
   test("can draw a rectangle on top of an existing rectangle", async ({ page }) => {
     await loadApp(page);
     
-    const canvas = page.locator("canvas");
-    const box = await canvas.boundingBox();
-    
-    // Draw first rectangle
-    await page.click('[data-tool="rectangle"]');
-    await page.mouse.move(box.x + 100, box.y + 100);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 200, box.y + 180);
-    await page.mouse.up();
+    // Draw first rectangle using proper drawing utility
+    await drawRectangle(page, { offsetX: -100, offsetY: -50, width: 100, height: 80 });
     
     // Verify first rectangle exists
     let shapeCount = await page.evaluate(() => window.animatorState.shapes.length);
     expect(shapeCount).toBe(1);
     
     // Draw second rectangle overlapping the first
-    await page.click('[data-tool="rectangle"]');
-    await page.mouse.move(box.x + 150, box.y + 120); // Over the first rectangle
-    await page.mouse.down();
-    await page.mouse.move(box.x + 250, box.y + 200);
-    await page.mouse.up();
+    await drawRectangle(page, { offsetX: 50, offsetY: 20, width: 100, height: 80 });
     
     // Should now have 2 rectangles
     shapeCount = await page.evaluate(() => window.animatorState.shapes.length);
@@ -42,22 +31,18 @@ test.describe("Drawing over shapes", () => {
   test("can draw a circle on top of an existing shape", async ({ page }) => {
     await loadApp(page);
     
-    const canvas = page.locator("canvas");
-    const box = await canvas.boundingBox();
-    
     // Draw a rectangle first
-    await page.click('[data-tool="rectangle"]');
-    await page.mouse.move(box.x + 100, box.y + 100);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 200, box.y + 180);
-    await page.mouse.up();
+    await drawRectangle(page, { offsetX: -50, offsetY: -40, width: 100, height: 80 });
     
     // Draw a circle on top
     await page.click('[data-tool="circle"]');
-    await page.mouse.move(box.x + 140, box.y + 130); // Inside the rectangle
-    await page.mouse.down();
-    await page.mouse.move(box.x + 180, box.y + 170);
-    await page.mouse.up();
+    const rect = await page.evaluate(() => {
+      const canvas = document.getElementById('stage');
+      return canvas.getBoundingClientRect();
+    });
+    const centerX = rect.x + rect.width / 2 + 10;
+    const centerY = rect.y + rect.height / 2 + 10;
+    await pointerDrag(page, centerX - 30, centerY - 30, centerX + 30, centerY + 30);
     
     const shapes = await page.evaluate(() => {
       return window.animatorState.shapes.map(s => s.type);
@@ -69,28 +54,13 @@ test.describe("Drawing over shapes", () => {
   test("can draw a line through existing shapes", async ({ page }) => {
     await loadApp(page);
     
-    const canvas = page.locator("canvas");
-    const box = await canvas.boundingBox();
-    
     // Draw two rectangles
-    await page.click('[data-tool="rectangle"]');
-    await page.mouse.move(box.x + 80, box.y + 80);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 150, box.y + 150);
-    await page.mouse.up();
-    
-    await page.click('[data-tool="rectangle"]');
-    await page.mouse.move(box.x + 200, box.y + 80);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 270, box.y + 150);
-    await page.mouse.up();
+    await drawRectangle(page, { offsetX: -120, offsetY: -35, width: 70, height: 70 });
+    await drawRectangle(page, { offsetX: 50, offsetY: -35, width: 70, height: 70 });
     
     // Draw a line that goes through both rectangles
-    await page.click('[data-tool="line"]');
-    await page.mouse.move(box.x + 100, box.y + 100); // Inside first rectangle
-    await page.mouse.down();
-    await page.mouse.move(box.x + 250, box.y + 130); // Inside second rectangle
-    await page.mouse.up();
+    await setTool(page, 'line');
+    await drawLine(page, { startDelta: { x: -100, y: 0 }, endDelta: { x: 100, y: 0 } });
     
     const shapes = await page.evaluate(() => {
       return window.animatorState.shapes.map(s => s.type);
@@ -105,20 +75,18 @@ test.describe("Drawing over shapes", () => {
     const canvas = page.locator("canvas");
     const box = await canvas.boundingBox();
     
-    // Draw a rectangle
-    await page.click('[data-tool="rectangle"]');
-    await page.mouse.move(box.x + 100, box.y + 100);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 200, box.y + 180);
-    await page.mouse.up();
+    // Draw a rectangle first
+    await drawRectangle(page, { offsetX: -50, offsetY: -40, width: 100, height: 80 });
     
     // Draw with pen over the rectangle
     await page.click('[data-tool="free"]');
-    await page.mouse.move(box.x + 120, box.y + 120);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 140, box.y + 130, { steps: 3 });
-    await page.mouse.move(box.x + 160, box.y + 140, { steps: 3 });
-    await page.mouse.up();
+    const rect = await page.evaluate(() => {
+      const canvas = document.getElementById('stage');
+      return canvas.getBoundingClientRect();
+    });
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+    await pointerDrag(page, centerX - 20, centerY - 10, centerX + 20, centerY + 10, { steps: 5 });
     
     const shapes = await page.evaluate(() => {
       return window.animatorState.shapes.map(s => s.type);
@@ -130,19 +98,18 @@ test.describe("Drawing over shapes", () => {
   test("select tool still selects existing shapes instead of drawing", async ({ page }) => {
     await loadApp(page);
     
-    const canvas = page.locator("canvas");
-    const box = await canvas.boundingBox();
-    
     // Draw a rectangle
-    await page.click('[data-tool="rectangle"]');
-    await page.mouse.move(box.x + 100, box.y + 100);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 200, box.y + 180);
-    await page.mouse.up();
+    await drawRectangle(page, { offsetX: -50, offsetY: -40, width: 100, height: 80 });
     
     // Switch to select tool and click on the rectangle
     await page.click('[data-tool="select"]');
-    await page.mouse.click(box.x + 150, box.y + 140);
+    const rect = await page.evaluate(() => {
+      const canvas = document.getElementById('stage');
+      return canvas.getBoundingClientRect();
+    });
+    const centerX = rect.x + rect.width / 2;
+    const centerY = rect.y + rect.height / 2;
+    await page.mouse.click(centerX, centerY);
     
     // Should still have only 1 shape (the rectangle)
     const shapeCount = await page.evaluate(() => window.animatorState.shapes.length);

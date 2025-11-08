@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
+import { loadApp } from "./utils.js";
 
 test.describe("Collapsible UI Elements", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("http://localhost:4173");
-    await page.waitForSelector("#stage");
+    await loadApp(page);
   });
 
   test("toolbar collapses and shows floating toggle button", async ({ page }) => {
@@ -68,6 +68,8 @@ test.describe("Collapsible UI Elements", () => {
   test("timeline collapses and shows floating toggle button at bottom", async ({ page }) => {
     const timeline = page.locator(".timeline");
     const floatingTimelineToggle = page.locator(".floating-timeline-menu .timeline-toggle-floating");
+
+
 
     // Timeline visible initially
     await expect(timeline).toBeVisible();

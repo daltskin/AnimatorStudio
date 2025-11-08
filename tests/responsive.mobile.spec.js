@@ -1,4 +1,5 @@
 import { test, expect, devices } from "@playwright/test";
+import { touchDrag } from "./utils.js";
 
 test.describe("Mobile Responsive Design", () => {
   test("toolbar auto-collapses on mobile viewport", async ({ browser }) => {
@@ -100,11 +101,11 @@ test.describe("Mobile Responsive Design", () => {
     const timelineBox = await timelineToggle.boundingBox();
     const zoomBox = await zoomControls.boundingBox();
 
-    // Ensure no overlap
-    const timelineBottom = timelineBox.y + timelineBox.height;
-    const zoomTop = zoomBox.y;
+    // Ensure no overlap - zoom controls should be positioned above timeline menu
+    const timelineTop = timelineBox.y;
+    const zoomBottom = zoomBox.y + zoomBox.height;
 
-    expect(zoomTop).toBeGreaterThan(timelineBottom);
+    expect(zoomBottom).toBeLessThan(timelineTop);
 
     await mobileContext.close();
   });
@@ -177,15 +178,11 @@ test.describe("Mobile Responsive Design", () => {
     const endX = canvasBox.x + 200;
     const endY = canvasBox.y + 200;
 
-    await page.touchscreen.touchStart(startX, startY);
-    await page.waitForTimeout(50);
-    await page.touchscreen.touchMove(endX, endY);
-    await page.waitForTimeout(50);
-    await page.touchscreen.touchEnd();
+    await touchDrag(page, startX, startY, endX, endY);
 
     // Check if shape was created
     const shapeCount = await page.evaluate(() => {
-      return window.state?.shapes?.length || 0;
+      return window.animatorState?.shapes?.length || 0;
     });
 
     expect(shapeCount).toBeGreaterThan(0);

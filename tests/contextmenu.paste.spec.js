@@ -10,9 +10,44 @@ test.describe('Context menu paste', () => {
   test('stage context menu has paste button', async ({ page }) => {
     await loadApp(page);
 
-    // Right-click on the stage
+    // Ensure nothing is selected
+    await page.evaluate(() => window.animatorState.selectedIds.clear());
+
+    // Right-click on empty area of the stage using mouse events
     const canvas = page.locator('canvas');
-    await canvas.click({ button: 'right', position: { x: 400, y: 300 } });
+    const canvasBox = await canvas.boundingBox();
+    const rightClickX = canvasBox.x + 100;
+    const rightClickY = canvasBox.y + 100;
+    
+    // Try dispatching contextmenu event directly
+    await page.evaluate(({ x, y }) => {
+      const canvas = document.getElementById('stage');
+      const rect = canvas.getBoundingClientRect();
+      const contextEvent = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        button: 2,
+        buttons: 2
+      });
+      canvas.dispatchEvent(contextEvent);
+    }, { x: rightClickX, y: rightClickY });
+
+    // Check if any context menu appeared
+    const contextMenus = await page.evaluate(() => {
+      const stage = document.getElementById('stageContextMenu');
+      const shape = document.getElementById('shapeContextMenu');
+      return {
+        stageHidden: stage?.hidden,
+        stageExists: !!stage,
+        shapeHidden: shape?.hidden,
+        shapeExists: !!shape,
+        stageDisplay: stage?.style.display,
+        shapeDisplay: shape?.style.display
+      };
+    });
+    console.log('Context menu status:', contextMenus);
 
     // Wait for context menu to appear
     await page.waitForSelector('#stageContextMenu:not([hidden])', { timeout: 1000 });

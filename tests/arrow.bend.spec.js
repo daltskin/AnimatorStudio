@@ -20,10 +20,7 @@ test.describe("Arrow bend handle", () => {
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
     
-    await page.mouse.move(centerX - 100, centerY);
-    await page.mouse.down();
-    await page.mouse.move(centerX + 100, centerY);
-    await page.mouse.up();
+    await pointerDrag(page, centerX - 100, centerY, centerX + 100, centerY);
     
     await ensureSelectionCount(page, 1);
     
@@ -55,10 +52,7 @@ test.describe("Arrow bend handle", () => {
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
     
-    await page.mouse.move(centerX - 100, centerY);
-    await page.mouse.down();
-    await page.mouse.move(centerX + 100, centerY);
-    await page.mouse.up();
+    await pointerDrag(page, centerX - 100, centerY, centerX + 100, centerY);
     
     await ensureSelectionCount(page, 1);
     
@@ -102,10 +96,7 @@ test.describe("Arrow bend handle", () => {
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
     
-    await page.mouse.move(centerX - 100, centerY);
-    await page.mouse.down();
-    await page.mouse.move(centerX + 100, centerY);
-    await page.mouse.up();
+    await pointerDrag(page, centerX - 100, centerY, centerX + 100, centerY);
     
     await ensureSelectionCount(page, 1);
     
@@ -153,10 +144,7 @@ test.describe("Arrow bend handle", () => {
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
     
-    await page.mouse.move(centerX - 100, centerY);
-    await page.mouse.down();
-    await page.mouse.move(centerX + 100, centerY);
-    await page.mouse.up();
+    await pointerDrag(page, centerX - 100, centerY, centerX + 100, centerY);
     
     await ensureSelectionCount(page, 1);
     
