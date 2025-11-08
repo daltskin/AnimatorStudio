@@ -143,7 +143,6 @@ test.describe("Mobile Responsive Design", () => {
     await page.goto("http://localhost:4173");
     await page.waitForSelector("#stage");
 
-    const timelineHeader = page.locator(".timeline-header");
     const timelineInfo = page.locator(".timeline-info");
 
     // Timeline info should wrap on small screens
