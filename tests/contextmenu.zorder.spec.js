@@ -31,11 +31,12 @@ test.describe('context menu z-order', () => {
 
     const selectBounds = await getShapeBounds(page, secondId);
     if (!selectBounds) throw new Error('Unable to resolve bounds for selection target');
-    const canvasRect = await getCanvasRect(page);
-    const selectX = canvasRect.x + selectBounds.x + selectBounds.width / 2;
-    const selectY = canvasRect.y + selectBounds.y + selectBounds.height / 2;
+    
+    // Use canvas-relative coordinates with canvas locator instead of screen coordinates
+    const canvasX = selectBounds.x + selectBounds.width / 2;
+    const canvasY = selectBounds.y + selectBounds.height / 2;
 
-    await page.mouse.click(selectX, selectY);
+    await page.locator('#stage').click({ position: { x: canvasX, y: canvasY } });
     await ensureSelectionCount(page, 1);
     await expect.poll(() => page.evaluate(() => window.animatorState.selection?.id ?? null)).toBe(secondId);
 
@@ -47,11 +48,17 @@ test.describe('context menu z-order', () => {
       if (!selectionId) throw new Error('No active selection for context menu action');
       const bounds = await getShapeBounds(page, selectionId);
       if (!bounds) throw new Error('Missing bounds for selected shape');
+      
+      // Calculate canvas-relative coordinates first
+      const canvasX = bounds.x + bounds.width / 2;
+      const canvasY = bounds.y + bounds.height / 2;
+      
+      // Convert to screen coordinates for the contextmenu event
       const rect = await getCanvasRect(page);
-      const centerX = rect.x + bounds.x + bounds.width / 2;
-      const centerY = rect.y + bounds.y + bounds.height / 2;
+      const centerX = rect.x + canvasX;
+      const centerY = rect.y + canvasY;
 
-      await page.mouse.click(centerX, centerY, { button: 'right' });
+      await page.locator('canvas').dispatchEvent('contextmenu', { clientX: centerX, clientY: centerY });
       const menu = page.locator('#shapeContextMenu');
       await expect(menu).toBeVisible();
       await menu.locator(`button[data-z-action="${action}"]`).click();

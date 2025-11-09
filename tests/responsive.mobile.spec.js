@@ -70,7 +70,7 @@ test.describe("Mobile Responsive Design", () => {
     await page.goto("http://localhost:4173");
     await page.waitForSelector("#stage");
 
-    const workspace = page.locator(".workspace");
+    const workspace = page.locator(".app-shell > .workspace");
     const workspaceStyle = await workspace.evaluate((el) => {
       const computed = window.getComputedStyle(el);
       return computed.display;
@@ -93,7 +93,10 @@ test.describe("Mobile Responsive Design", () => {
 
     // Collapse timeline to show floating button
     await page.locator(".timeline .timeline-toggle").click();
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(600); // Increased wait time for animation
+
+    // Wait for floating menu to be visible
+    await page.locator(".floating-timeline-menu").waitFor({ state: 'visible' });
 
     const timelineToggle = page.locator(".floating-timeline-menu");
     const zoomControls = page.locator(".zoom-controls");

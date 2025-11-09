@@ -41,187 +41,198 @@
 
       <div class="workspace">
         <aside class="toolbar" aria-label="Editor controls">
-          <div class="toolbar-section">
-            <div class="toolbar-section-header">
-              <h2>Appearance</h2>
-              <button
-                type="button"
-                class="toolbar-toggle tool-menu-toggle icon-only"
-                data-toolbar-toggle
-                aria-pressed="false"
-                aria-label="Hide toolbar"
-                title="Hide the toolbar"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
-                  <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
-                  <path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                </svg>
-              </button>
-            </div>
-            <div class="control color-controls" role="group" aria-label="Fill and stroke colours">
-              <label class="color-control">
-                <span class="control-label">Fill</span>
-                <input type="color" id="fillColor" value="#ff6b6b" title="Pick the fill colour" />
-              </label>
-              <label class="color-control">
-                <span class="control-label">Stroke</span>
-                <input type="color" id="strokeColor" value="#1f2937" title="Pick the stroke colour" />
-              </label>
-            </div>
-            <label class="control">
-              <span class="control-label">Stroke width</span>
-              <input type="range" id="strokeWidth" min="1" max="12" value="3" title="Adjust stroke width" />
-              <span id="strokeWidthValue" class="value">3px</span>
-            </label>
-            <div class="control icon-toggle-group" id="strokeStyleControl">
-              <span class="control-label">Stroke style</span>
-              <div class="icon-toggle-row" role="radiogroup" aria-label="Stroke style">
-                <button type="button" class="icon-toggle selected" data-stroke-style="solid" aria-pressed="true" title="Draw solid outlines">
-                  <span class="sr-only">Solid stroke</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M4 12h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
-                  </svg>
-                </button>
-                <button type="button" class="icon-toggle" data-stroke-style="dashed" aria-pressed="false" title="Draw dashed outlines">
-                  <span class="sr-only">Dashed stroke</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M4 12h4m4 0h4m4 0h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="8 6"></path>
-                  </svg>
-                </button>
-                <button type="button" class="icon-toggle" data-stroke-style="dotted" aria-pressed="false" title="Draw dotted outlines">
-                  <span class="sr-only">Dotted stroke</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M4 12h0m4 0h0m4 0h0m4 0h0m4 0h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="control icon-toggle-group" id="sketchControl">
-              <span class="control-label">Sketchiness</span>
-              <div class="icon-toggle-row" role="radiogroup" aria-label="Sketchiness">
-                  <button type="button" class="icon-toggle selected" data-sketch-level="0" aria-pressed="true" title="Architect straight lines">
-                    <span class="sr-only">Architect</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M4 12h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                  </svg>
-                </button>
-                  <button type="button" class="icon-toggle" data-sketch-level="1" aria-pressed="false" title="Artist slight overbrushed lines">
-                    <span class="sr-only">Artist</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M4 12c3 0 3-4 6-4s3 4 6 4 3-4 6-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                  </svg>
-                </button>
-                  <button type="button" class="icon-toggle" data-sketch-level="2" aria-pressed="false" title="Cartoonist heavier overbrushed lines">
-                    <span class="sr-only">Cartoonist</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M4 11.5c2 3 4-3 6-1.5s2 4.5 4 3 2-4 4-2 2 4 4 1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="control icon-toggle-group" id="fillStyleControl">
-              <span class="control-label">Fill style</span>
-              <div class="icon-toggle-row" role="radiogroup" aria-label="Fill style">
-                <button type="button" class="icon-toggle" data-fill-style="solid" aria-pressed="false" title="Use a solid fill">
-                  <span class="sr-only">Solid fill</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
-                  </svg>
-                </button>
-                <button type="button" class="icon-toggle selected" data-fill-style="cross-hatch" aria-pressed="true" title="Fill with cross-hatch pattern">
-                  <span class="sr-only">Cross-hatch fill</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-                    <path d="M8 8l8 8m0-8l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                  </svg>
-                </button>
-                <button type="button" class="icon-toggle" data-fill-style="hachure" aria-pressed="false" title="Fill with angled hatch lines">
-                  <span class="sr-only">Hachure fill</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-                    <path d="M8 18l8-8M10 18l8-8M12 18l8-8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div class="control icon-toggle-group" id="edgeStyleControl">
-              <span class="control-label">Edge style</span>
-              <div class="icon-toggle-row" role="radiogroup" aria-label="Edge style">
-                <button type="button" class="icon-toggle" data-edge-style="sharp" aria-pressed="false" title="Draw sharp corners">
-                  <span class="sr-only">Sharp corners</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <rect x="6" y="6" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="miter" />
-                  </svg>
-                </button>
-                <button type="button" class="icon-toggle selected" data-edge-style="round" aria-pressed="true" title="Use rounded corners">
-                  <span class="sr-only">Rounded corners</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <rect x="6" y="6" width="12" height="12" rx="4" ry="4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <label class="control">
-              <span class="control-label">Opacity</span>
-              <input type="range" id="opacity" min="0" max="100" value="100" title="Adjust fill opacity" />
-              <span id="opacityValue" class="value">100%</span>
-            </label>
-            <label class="control">
-              <span class="control-label">Font family</span>
-              <select id="fontFamily" title="Choose the font for text shapes">
-                <option value="Excalifont" selected>Excalifont — Hand-drawn Sans</option>
-                <option value="Inter">Inter — Clean Sans</option>
-                <option value="Poppins">Poppins — Rounded Sans</option>
-                <option value="Roboto">Roboto — Classic Sans</option>
-                <option value="Montserrat">Montserrat — Geometric Sans</option>
-                <option value="Source Sans Pro">Source Sans Pro — UI Sans</option>
-                <option value="Work Sans">Work Sans — Friendly Sans</option>
-                <option value="Nunito">Nunito — Soft Sans</option>
-                <option value="Raleway">Raleway — Elegant Sans</option>
-                <option value="Merriweather">Merriweather — Reading Serif</option>
-                <option value="Lora">Lora — Warm Serif</option>
-                <option value="Playfair Display">Playfair Display — Editorial Serif</option>
-                <option value="DM Serif Display">DM Serif Display — Deco Serif</option>
-                <option value="Caveat">Caveat — Handwritten</option>
-                <option value="Shadows Into Light">Shadows Into Light — Casual Hand</option>
-                <option value="Amatic SC">Amatic SC — Tall Hand</option>
-                <option value="Pacifico">Pacifico — Script</option>
-                <option value="Lobster">Lobster — Retro Script</option>
-                <option value="Permanent Marker">Permanent Marker — Graffiti</option>
-                <option value="IBM Plex Mono">IBM Plex Mono — Technical Mono</option>
-                <option value="Fira Code">Fira Code — Coding Mono</option>
-                <option value="Courier Prime">Courier Prime — Classic Mono</option>
-              </select>
-            </label>
-            <div class="control icon-toggle-group arrow-ending-control" id="arrowEndingControl" hidden>
-              <span class="control-label">Arrow endings</span>
-              <div class="icon-toggle-row" role="group" aria-label="Arrow endings">
-                <button type="button" class="icon-toggle" data-arrow-toggle="start" aria-pressed="false" title="Toggle arrowhead at the start of the line">
-                  <span class="sr-only">Toggle arrowhead at start</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M8 12l6-4v3h6v2h-6v3z" fill="currentColor" />
-                    <path d="M4 12h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                  </svg>
-                </button>
-                <button type="button" class="icon-toggle" data-arrow-toggle="end" aria-pressed="true" title="Toggle arrowhead at the end of the line">
-                  <span class="sr-only">Toggle arrowhead at end</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path d="M16 12l-6 4v-3H4v-2h6V8z" fill="currentColor" />
-                    <path d="M20 12h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
+              <div class="toolbar-section">
+                <div class="toolbar-section-header">
+                  <h2>Appearance</h2>
+                  <button
+                    type="button"
+                    class="toolbar-toggle tool-menu-toggle icon-only"
+                    data-toolbar-toggle
+                    aria-pressed="false"
+                    aria-label="Hide toolbar"
+                    title="Hide the toolbar"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="collapse">
+                      <path d="M14 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="expand">
+                      <path d="M10 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                  </button>
+                </div>
+                <div class="workspace">
+                  <div class="control color-controls" role="group" aria-label="Fill and stroke colours">
+                    <label class="color-control">
+                      <span class="control-label">Fill</span>
+                      <input type="color" id="fillColor" value="#ff6b6b" title="Pick the fill colour" />
+                    </label>
+                    <label class="color-control">
+                      <span class="control-label">Stroke</span>
+                      <input type="color" id="strokeColor" value="#1f2937" title="Pick the stroke colour" />
+                    </label>
+                  </div>
+                  <label class="control">
+                    <span class="control-label">Stroke width</span>
+                    <input type="range" id="strokeWidth" min="1" max="12" value="3" title="Adjust stroke width" />
+                    <span id="strokeWidthValue" class="value">3px</span>
+                  </label>
+                  <div class="control icon-toggle-group" id="strokeStyleControl">
+                    <span class="control-label">Stroke style</span>
+                    <div class="icon-toggle-row" role="radiogroup" aria-label="Stroke style">
+                      <button type="button" class="icon-toggle selected" data-stroke-style="solid" aria-pressed="true" title="Draw solid outlines">
+                        <span class="sr-only">Solid stroke</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M4 12h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                        </svg>
+                      </button>
+                      <button type="button" class="icon-toggle" data-stroke-style="dashed" aria-pressed="false" title="Draw dashed outlines">
+                        <span class="sr-only">Dashed stroke</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M4 12h4m4 0h4m4 0h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="8 6"></path>
+                        </svg>
+                      </button>
+                      <button type="button" class="icon-toggle" data-stroke-style="dotted" aria-pressed="false" title="Draw dotted outlines">
+                        <span class="sr-only">Dotted stroke</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M4 12h0m4 0h0m4 0h0m4 0h0m4 0h0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="control icon-toggle-group" id="sketchControl">
+                    <span class="control-label">Sketchiness</span>
+                    <div class="icon-toggle-row" role="radiogroup" aria-label="Sketchiness">
+                        <button type="button" class="icon-toggle selected" data-sketch-level="0" aria-pressed="true" title="Architect straight lines">
+                          <span class="sr-only">Architect</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M4 12h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                        <button type="button" class="icon-toggle" data-sketch-level="1" aria-pressed="false" title="Artist slight overbrushed lines">
+                          <span class="sr-only">Artist</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M4 12c3 0 3-4 6-4s3 4 6 4 3-4 6-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                        <button type="button" class="icon-toggle" data-sketch-level="2" aria-pressed="false" title="Cartoonist heavier overbrushed lines">
+                          <span class="sr-only">Cartoonist</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M4 11.5c2 3 4-3 6-1.5s2 4.5 4 3 2-4 4-2 2 4 4 1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="control icon-toggle-group" id="fillStyleControl">
+                    <span class="control-label">Fill style</span>
+                    <div class="icon-toggle-row" role="radiogroup" aria-label="Fill style">
+                      <button type="button" class="icon-toggle" data-fill-style="solid" aria-pressed="false" title="Use a solid fill">
+                        <span class="sr-only">Solid fill</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+                        </svg>
+                      </button>
+                      <button type="button" class="icon-toggle selected" data-fill-style="cross-hatch" aria-pressed="true" title="Fill with cross-hatch pattern">
+                        <span class="sr-only">Cross-hatch fill</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                          <path d="M8 8l8 8m0-8l-8 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                      <button type="button" class="icon-toggle" data-fill-style="hachure" aria-pressed="false" title="Fill with angled hatch lines">
+                        <span class="sr-only">Hachure fill</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <rect x="6" y="6" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
+                          <path d="M8 18l8-8M10 18l8-8M12 18l8-8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="control icon-toggle-group" id="edgeStyleControl">
+                    <span class="control-label">Edge style</span>
+                    <div class="icon-toggle-row" role="radiogroup" aria-label="Edge style">
+                      <button type="button" class="icon-toggle" data-edge-style="sharp" aria-pressed="false" title="Draw sharp corners">
+                        <span class="sr-only">Sharp corners</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <rect x="6" y="6" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="miter" />
+                        </svg>
+                      </button>
+                      <button type="button" class="icon-toggle selected" data-edge-style="round" aria-pressed="true" title="Use rounded corners">
+                        <span class="sr-only">Rounded corners</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <rect x="6" y="6" width="12" height="12" rx="4" ry="4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  <label class="control">
+                    <span class="control-label">Opacity</span>
+                    <input type="range" id="opacity" min="0" max="100" value="100" title="Adjust fill opacity" />
+                    <span id="opacityValue" class="value">100%</span>
+                  </label>
+                  <label class="control">
+                    <span class="control-label">Font family</span>
+                    <select id="fontFamily" title="Choose the font for text shapes">
+                      <option value="Excalifont" selected>Excalifont — Hand-drawn Sans</option>
+                      <option value="Inter">Inter — Clean Sans</option>
+                      <option value="Poppins">Poppins — Rounded Sans</option>
+                      <option value="Roboto">Roboto — Classic Sans</option>
+                      <option value="Montserrat">Montserrat — Geometric Sans</option>
+                      <option value="Source Sans Pro">Source Sans Pro — UI Sans</option>
+                      <option value="Work Sans">Work Sans — Friendly Sans</option>
+                      <option value="Nunito">Nunito — Soft Sans</option>
+                      <option value="Raleway">Raleway — Elegant Sans</option>
+                      <option value="Merriweather">Merriweather — Reading Serif</option>
+                      <option value="Lora">Lora — Warm Serif</option>
+                      <option value="Playfair Display">Playfair Display — Editorial Serif</option>
+                      <option value="DM Serif Display">DM Serif Display — Deco Serif</option>
+                      <option value="Caveat">Caveat — Handwritten</option>
+                      <option value="Shadows Into Light">Shadows Into Light — Casual Hand</option>
+                      <option value="Amatic SC">Amatic SC — Tall Hand</option>
+                      <option value="Pacifico">Pacifico — Script</option>
+                      <option value="Lobster">Lobster — Retro Script</option>
+                      <option value="Permanent Marker">Permanent Marker — Graffiti</option>
+                      <option value="IBM Plex Mono">IBM Plex Mono — Technical Mono</option>
+                      <option value="Fira Code">Fira Code — Coding Mono</option>
+                      <option value="Courier Prime">Courier Prime — Classic Mono</option>
+                    </select>
+                  </label>
+                  <div class="control icon-toggle-group arrow-ending-control" id="arrowEndingControl" hidden>
+                    <span class="control-label">Arrow endings</span>
+                    <div class="icon-toggle-row" role="group" aria-label="Arrow endings">
+                      <button type="button" class="icon-toggle" data-arrow-toggle="start" aria-pressed="false" title="Toggle arrowhead at the start of the line">
+                        <span class="sr-only">Toggle arrowhead at start</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M8 12l6-4v3h6v2h-6v3z" fill="currentColor" />
+                          <path d="M4 12h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                      <button type="button" class="icon-toggle" data-arrow-toggle="end" aria-pressed="true" title="Toggle arrowhead at the end of the line">
+                        <span class="sr-only">Toggle arrowhead at end</span>
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                          <path d="M16 12l-6 4v-3H4v-2h6V8z" fill="currentColor" />
+                          <path d="M20 12h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-          <div class="toolbar-section tips" data-tips>
-            <div class="tips-header">
-              <h2>Tips</h2>
-            </div>
-            <ul id="tipsList"></ul>
-          </div>
+                </div>
+
+                <div class="toolbar-section">
+                  <button
+                    type="button" 
+                    id="tipsToggle" 
+                    class="toolbar-toggle icon-only"
+                    title="Show helpful tips for new users"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" />
+                      <line x1="12" y1="16" x2="12" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                      <circle cx="12" cy="8" r="1" fill="currentColor" />
+                    </svg>
+                  </button>
+                </div>
         </aside>
 
         <section class="stage-area">
@@ -381,6 +392,23 @@
                     <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
                   </svg>
                 </button>
+              </div>
+
+              <div class="floating-tips-panel" id="floatingTipsPanel" style="display: none;" aria-label="Helpful tips">
+                <div class="tips-header">
+                  <h3>Tips for New Users</h3>
+                  <button type="button" id="tipsClose" class="icon-only" title="Close tips">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                </div>
+                <ul id="tipsList"></ul>
+                <div class="tips-footer" id="tipsFooter" style="display: none;">
+                  <button type="button" id="tipsReset" class="ghost" title="Reset all tips to see them again">
+                    Reset all tips
+                  </button>
+                </div>
               </div>
             </div>
           </div>

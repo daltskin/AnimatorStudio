@@ -1,29 +1,46 @@
-import { test, expect } from "@playwright/test";
+const { test, expect } = require("@playwright/test");
+const { loadApp, drawRectangle, setTool, getCanvasRect, drawDiamond, drawLine, pointerDrag } = require('./utils');
+
+// Utility to draw a circle
+async function drawCircle(page, { offsetX = 0, offsetY = 0, radius = 40 } = {}) {
+  await setTool(page, 'circle');
+  const rect = await getCanvasRect(page);
+  const centerX = rect.x + rect.width / 2 + offsetX;
+  const centerY = rect.y + rect.height / 2 + offsetY;
+  
+  await pointerDrag(page, centerX - radius, centerY - radius, centerX + radius, centerY + radius);
+}
+
+// Utility to get canvas-relative click coordinates for a shape
+async function getShapeCanvasCoords(page, shapeIndex = 0) {
+  const shapeBounds = await page.evaluate((index) => {
+    const shapes = window.animatorApi.getShapes();
+    return shapes.length > index ? window.animatorApi.getShapeBounds(shapes[index].id) : null;
+  }, shapeIndex);
+  
+  if (!shapeBounds) throw new Error('Shape not found');
+  
+  return {
+    x: shapeBounds.x + shapeBounds.width / 2,
+    y: shapeBounds.y + shapeBounds.height / 2
+  };
+}
 
 test.describe("Shape labels", () => {
   test("double-clicking a rectangle shows label editor", async ({ page }) => {
-    await page.goto("http://localhost:4173");
-    await page.waitForSelector("#stage");
+    await loadApp(page);
 
-    // Select rectangle tool
-    await page.click('[data-tool="rectangle"]');
+    // Draw a rectangle using the utility function
+    await drawRectangle(page);
+    
+    // Switch to select tool  
+    await setTool(page, 'select');
 
-    // Draw a rectangle
-    const canvas = await page.$("#stage");
-    const box = await canvas.boundingBox();
-    const x = box.x + 200;
-    const y = box.y + 200;
-
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x + 100, y + 80);
-    await page.mouse.up();
-
-    // Switch to select tool
-    await page.click('[data-tool="select"]');
-
-    // Double-click the rectangle
-    await page.mouse.dblclick(x + 50, y + 40);
+    // Get canvas-relative coordinates for the shape
+    const coords = await getShapeCanvasCoords(page);
+    
+    // Double-click the rectangle using canvas-relative coordinates
+    await page.locator('#stage').dblclick({ position: { x: coords.x, y: coords.y } });
 
     // Verify label editor appears
     const labelEditor = await page.waitForSelector(".canvas-label-editor", { timeout: 2000 });
@@ -31,28 +48,17 @@ test.describe("Shape labels", () => {
   });
 
   test("label editor accepts text input", async ({ page }) => {
-    await page.goto("http://localhost:4173");
-    await page.waitForSelector("#stage");
+    await loadApp(page);
 
-    // Select circle tool
-    await page.click('[data-tool="circle"]');
-
-    // Draw a circle
-    const canvas = await page.$("#stage");
-    const box = await canvas.boundingBox();
-    const x = box.x + 300;
-    const y = box.y + 300;
-
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x + 80, y + 80);
-    await page.mouse.up();
+    // Draw a circle using the utility function
+    await drawCircle(page);
 
     // Switch to select tool
-    await page.click('[data-tool="select"]');
+    await setTool(page, 'select');
 
-    // Double-click the circle
-    await page.mouse.dblclick(x + 40, y + 40);
+    // Get canvas-relative coordinates for the circle
+    const coords = await getShapeCanvasCoords(page);
+    await page.locator('#stage').dblclick({ position: { x: coords.x, y: coords.y } });
 
     // Type in the label editor
     const labelEditor = await page.waitForSelector(".canvas-label-editor");
@@ -67,35 +73,24 @@ test.describe("Shape labels", () => {
   });
 
   test("labels appear centered on shapes", async ({ page }) => {
-    await page.goto("http://localhost:4173");
-    await page.waitForSelector("#stage");
+    await loadApp(page);
 
-    // Select diamond tool
-    await page.click('[data-tool="diamond"]');
-
-    // Draw a diamond
-    const canvas = await page.$("#stage");
-    const box = await canvas.boundingBox();
-    const x = box.x + 400;
-    const y = box.y + 200;
-
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x + 100, y + 100);
-    await page.mouse.up();
-
+    // Draw a diamond using the utility function
+    await drawDiamond(page);
+    
     // Switch to select tool
-    await page.click('[data-tool="select"]');
+    await setTool(page, 'select');
 
-    // Double-click the diamond
-    await page.mouse.dblclick(x + 50, y + 50);
+    // Get canvas-relative coordinates for the diamond
+    const coords = await getShapeCanvasCoords(page);
+    await page.locator('#stage').dblclick({ position: { x: coords.x, y: coords.y } });
 
     // Type in the label editor
     const labelEditor = await page.waitForSelector(".canvas-label-editor");
     await labelEditor.type("Diamond");
     await page.keyboard.press("Enter");
 
-    // Verify the shape has a label property
+    // Verify the shape has a label
     const shapeData = await page.evaluate(() => {
       return window.animatorApi.getShapes()[0];
     });
@@ -104,23 +99,17 @@ test.describe("Shape labels", () => {
   });
 
   test("labels are preserved in exports", async ({ page }) => {
-    await page.goto("http://localhost:4173");
-    await page.waitForSelector("#stage");
+    await loadApp(page);
 
-    // Draw a rectangle with a label
-    await page.click('[data-tool="rectangle"]');
-    const canvas = await page.$("#stage");
-    const box = await canvas.boundingBox();
-    const x = box.x + 200;
-    const y = box.y + 200;
-
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x + 100, y + 80);
-    await page.mouse.up();
-
-    await page.click('[data-tool="select"]');
-    await page.mouse.dblclick(x + 50, y + 40);
+    // Draw a rectangle
+    await drawRectangle(page);
+    
+    // Switch to select tool
+    await setTool(page, 'select');
+    
+    // Get canvas-relative coordinates for the rectangle
+    const coords = await getShapeCanvasCoords(page);
+    await page.locator('#stage').dblclick({ position: { x: coords.x, y: coords.y } });
 
     const labelEditor = await page.waitForSelector(".canvas-label-editor");
     await labelEditor.type("Export Test");
@@ -136,19 +125,14 @@ test.describe("Shape labels", () => {
   });
 
   test("double-clicking text shape does not show label editor", async ({ page }) => {
-    await page.goto("http://localhost:4173");
-    await page.waitForSelector("#stage");
+    await loadApp(page);
 
     // Select text tool
-    await page.click('[data-tool="text"]');
+    await setTool(page, 'text');
 
-    // Create a text shape
-    const canvas = await page.$("#stage");
-    const box = await canvas.boundingBox();
-    const x = box.x + 200;
-    const y = box.y + 200;
-
-    await page.mouse.click(x, y);
+    // Create a text shape at canvas center using canvas-relative coordinates
+    const rect = await getCanvasRect(page);
+    await page.locator('#stage').click({ position: { x: rect.width / 2, y: rect.height / 2 } });
 
     // There should be a text editor, not a label editor
     const textEditor = await page.waitForSelector(".canvas-text-editor", { timeout: 2000 });
@@ -159,24 +143,16 @@ test.describe("Shape labels", () => {
   });
 
   test("labels work on line shapes", async ({ page }) => {
-    await page.goto("http://localhost:4173");
-    await page.waitForSelector("#stage");
+    await loadApp(page);
 
-    // Draw a line
-    await page.click('[data-tool="line"]');
-    const canvas = await page.$("#stage");
-    const box = await canvas.boundingBox();
-    const x = box.x + 200;
-    const y = box.y + 200;
+    // Draw a line using the utility function
+    await setTool(page, 'line');
+    await drawLine(page);
 
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x + 150, y + 100);
-    await page.mouse.up();
-
-    // Switch to select tool and double-click the line
-    await page.click('[data-tool="select"]');
-    await page.mouse.dblclick(x + 75, y + 50);
+    // Switch to select tool and get canvas-relative line coordinates
+    await setTool(page, 'select');
+    const coords = await getShapeCanvasCoords(page);
+    await page.locator('#stage').dblclick({ position: { x: coords.x, y: coords.y } });
 
     // Verify label editor appears
     const labelEditor = await page.waitForSelector(".canvas-label-editor", { timeout: 2000 });

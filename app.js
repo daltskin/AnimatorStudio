@@ -100,8 +100,12 @@ const elements = {
   backgroundGrid: document.getElementById("backgroundGrid"),
   shapeContextMenu: document.getElementById("shapeContextMenu"),
   stageContextMenu: document.getElementById("stageContextMenu"),
-  tipsPanel: document.querySelector("[data-tips]"),
+  tipsToggle: document.getElementById("tipsToggle"),
+  tipsPanel: document.getElementById("floatingTipsPanel"),
   tipsList: document.getElementById("tipsList"),
+  tipsClose: document.getElementById("tipsClose"),
+  tipsFooter: document.getElementById("tipsFooter"),
+  tipsReset: document.getElementById("tipsReset"),
   canvasWrapper: document.querySelector(".canvas-wrapper"),
   stageSurface: document.querySelector(".stage-surface"),
   stageDimensions: document.getElementById("stageDimensions"),
@@ -1198,6 +1202,9 @@ function bindEvents() {
     elements.stageResizeHandle?.addEventListener("touchstart", startStageResize, { passive: false });
   }
   elements.tipsList?.addEventListener("click", handleTipsListClick);
+  elements.tipsToggle?.addEventListener("click", showTipsPanel);
+  elements.tipsClose?.addEventListener("click", hideTipsPanel);
+  elements.tipsReset?.addEventListener("click", resetAllTips);
   window.addEventListener("pointermove", handleStageResizeMove);
   window.addEventListener("pointerup", endStageResize);
   window.addEventListener("pointercancel", endStageResize);
@@ -8697,7 +8704,8 @@ function applyArrowToggle(key, value) {
 
 function initializeTipsPanel() {
   dismissedTips = loadDismissedTips();
-  renderTipsPanel();
+  // Don't automatically show tips panel on init
+  // Tips will be shown when user clicks the tips button
 }
 
 function handleTipsListClick(event) {
@@ -8714,16 +8722,75 @@ function handleTipsListClick(event) {
   renderTipsPanel();
 }
 
+function showTipsPanel() {
+  if (!elements.tipsPanel) return;
+  
+  renderTipsPanel();
+  elements.tipsPanel.style.display = 'block';
+  setTimeout(() => {
+    elements.tipsPanel.classList.add('visible');
+    // Add click-outside listener after panel is visible with short delay
+    setTimeout(() => {
+      document.addEventListener('click', handleTipsPanelClickOutside);
+    }, 100); // Short delay to prevent interference but still be responsive
+  }, 10);
+}
+
+function hideTipsPanel() {
+  if (!elements.tipsPanel) return;
+  
+  elements.tipsPanel.classList.remove('visible');
+  setTimeout(() => {
+    elements.tipsPanel.style.display = 'none';
+  }, 300);
+  
+  // Remove click-outside listener when hiding panel
+  document.removeEventListener('click', handleTipsPanelClickOutside);
+}
+
+function handleTipsPanelClickOutside(event) {
+  // Check if click is outside the tips panel and not on the tips toggle button
+  if (!elements.tipsPanel || !elements.tipsToggle) return;
+  
+  // Don't close if panel is not visible
+  if (!elements.tipsPanel.classList.contains('visible')) return;
+  
+  const clickedInsidePanel = elements.tipsPanel.contains(event.target);
+  const clickedOnToggle = elements.tipsToggle.contains(event.target);
+  
+  // Also check if clicked on any button or interactive element that might be related
+  const clickedOnButton = event.target.closest('button');
+  const clickedOnTipDismiss = event.target.closest('.tip-dismiss');
+  
+  // Don't close if clicking on tip dismiss buttons or other panel interactions
+  if (!clickedInsidePanel && !clickedOnToggle && !clickedOnTipDismiss) {
+    hideTipsPanel();
+  }
+}
+
+function resetAllTips() {
+  dismissedTips.clear();
+  persistDismissedTips();
+  renderTipsPanel();
+}
+
 function renderTipsPanel() {
   if (!elements.tipsPanel || !elements.tipsList) {
     return;
   }
   const activeTips = TIPS_CONTENT.filter((tip) => !dismissedTips.has(tip.id));
   if (activeTips.length === 0) {
-    elements.tipsPanel.remove();
-    elements.tipsPanel = null;
-    elements.tipsList = null;
+    // Show reset option when all tips are dismissed
+    elements.tipsList.innerHTML = '<li class="tip-item">All tips dismissed! Great job learning the interface.</li>';
+    if (elements.tipsFooter) {
+      elements.tipsFooter.style.display = 'block';
+    }
     return;
+  } else {
+    // Hide reset button when there are active tips
+    if (elements.tipsFooter) {
+      elements.tipsFooter.style.display = 'none';
+    }
   }
   elements.tipsList.innerHTML = "";
   activeTips.forEach((tip) => {
@@ -8739,7 +8806,9 @@ function renderTipsPanel() {
     dismissButton.setAttribute("data-tip-id", tip.id);
     dismissButton.setAttribute("title", "Dismiss tip");
     dismissButton.setAttribute("aria-label", `Dismiss tip: ${tip.text}`);
-    dismissButton.textContent = "×";
+    dismissButton.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
 
     item.appendChild(message);
     item.appendChild(dismissButton);

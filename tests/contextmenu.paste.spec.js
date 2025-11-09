@@ -72,7 +72,7 @@ test.describe('Context menu paste', () => {
 
     // Right-click on the stage
     const canvas = page.locator('canvas');
-    await canvas.click({ button: 'right', position: { x: 400, y: 300 } });
+    await canvas.dispatchEvent('contextmenu', { clientX: 400, clientY: 300 });
 
     // Wait for context menu to appear
     await page.waitForSelector('#stageContextMenu:not([hidden])', { timeout: 1000 });
@@ -124,7 +124,7 @@ test.describe('Context menu paste', () => {
     await page.waitForTimeout(200);
 
     // Right-click on empty area
-    await canvas.click({ button: 'right', position: { x: 100, y: 100 } });
+    await canvas.dispatchEvent('contextmenu', { clientX: 100, clientY: 100 });
 
     // Wait for context menu
     await page.waitForSelector('#stageContextMenu:not([hidden])', { timeout: 2000 });
@@ -151,9 +151,25 @@ test.describe('Context menu paste', () => {
       return navigator.clipboard.writeText('test');
     });
 
-    // Right-click on the stage
+    // Right-click on empty area of the stage using mouse events (same approach as working tests)
     const canvas = page.locator('canvas');
-    await canvas.click({ button: 'right', position: { x: 400, y: 300 } });
+    const canvasBox = await canvas.boundingBox();
+    const rightClickX = canvasBox.x + 400;
+    const rightClickY = canvasBox.y + 300;
+    
+    // Dispatch contextmenu event directly
+    await page.evaluate(({ x, y }) => {
+      const canvas = document.getElementById('stage');
+      const contextEvent = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        button: 2,
+        buttons: 2
+      });
+      canvas.dispatchEvent(contextEvent);
+    }, { x: rightClickX, y: rightClickY });
 
     // Wait for context menu to appear
     await page.waitForSelector('#stageContextMenu:not([hidden])', { timeout: 1000 });
@@ -170,9 +186,25 @@ test.describe('Context menu paste', () => {
   test('context menu has visual separator between paste and background options', async ({ page }) => {
     await loadApp(page);
 
-    // Right-click on the stage
+    // Right-click on empty area of the stage using mouse events (same approach as working test)
     const canvas = page.locator('canvas');
-    await canvas.click({ button: 'right', position: { x: 400, y: 300 } });
+    const canvasBox = await canvas.boundingBox();
+    const rightClickX = canvasBox.x + 400;
+    const rightClickY = canvasBox.y + 300;
+    
+    // Dispatch contextmenu event directly
+    await page.evaluate(({ x, y }) => {
+      const canvas = document.getElementById('stage');
+      const contextEvent = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        button: 2,
+        buttons: 2
+      });
+      canvas.dispatchEvent(contextEvent);
+    }, { x: rightClickX, y: rightClickY });
 
     // Wait for context menu to appear
     await page.waitForSelector('#stageContextMenu:not([hidden])', { timeout: 1000 });

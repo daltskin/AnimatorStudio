@@ -239,19 +239,16 @@ body {
 }
 
 .app-shell.toolbar-collapsed .toolbar {
-  transform: translate(-100%, -75%);
+  transform: translate(-100%, -50%);
   opacity: 0;
   pointer-events: none;
 }
 
-.app-shell.toolbar-collapsed .stage-area {
-}
-
 .toolbar {
   position: absolute;
-  top: 50%;
-  transform: translateY(-75%);
-  left: 2rem;
+  top: 30%; /* Position higher to ensure tips section is visible */
+  transform: translateY(-50%);
+  left: 1rem;
   z-index: 100;
   width: 280px;
   background: var(--panel-light);
@@ -331,6 +328,7 @@ body {
   padding: 0.85rem 1.25rem;
   border-radius: 1.25rem;
   background: rgba(17, 24, 39, 0.72);
+  z-index: 150;
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45);
   backdrop-filter: blur(18px);
@@ -668,52 +666,7 @@ button.danger:disabled {
   cursor: not-allowed;
 }
 
-.toolbar-section.tips {
-  display: flex;
-  flex-direction: column;
-  max-height: 200px;
-  overflow: hidden;
-}
 
-.tips-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-shrink: 0;
-}
-
-.tips ul {
-  margin: 0;
-  padding-left: 0;
-  padding-right: 0.5rem;
-  color: rgba(229, 231, 235, 0.85);
-  font-size: 0.85rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
-}
-
-.tips ul::-webkit-scrollbar {
-  width: 6px;
-}
-
-.tips ul::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.tips ul::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
-  border-radius: 3px;
-}
-
-.tips ul::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5);
-}
 
 .tip-item {
   list-style: none;
@@ -1247,6 +1200,85 @@ button.danger:disabled {
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45);
 }
 
+.floating-tips-panel {
+  position: absolute;
+  bottom: 1rem;
+  left: 20rem; /* Position to the right of the toolbar */
+  z-index: 15;
+  width: 320px;
+  max-height: 400px;
+  background: rgba(17, 24, 39, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(18px);
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  display: none;
+  opacity: 0;
+  transition: opacity 300ms ease, transform 300ms ease;
+}
+
+.floating-tips-panel.visible {
+  display: block;
+  opacity: 1;
+}
+
+.floating-tips-panel .tips-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-shrink: 0;
+  margin-bottom: 1rem;
+}
+
+.floating-tips-panel .tips-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.floating-tips-panel #tipsList {
+  margin: 0;
+  padding: 0;
+  color: rgba(229, 231, 235, 0.85);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 280px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.floating-tips-panel #tipsList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.floating-tips-panel #tipsList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.floating-tips-panel #tipsList::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 3px;
+}
+
+.floating-tips-panel #tipsList::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+.floating-tips-panel .tips-footer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+}
+
 .timeline-toggle {
   margin-left: auto;
   flex-shrink: 0;
@@ -1578,7 +1610,7 @@ button.danger:disabled {
   }
 
   .app-shell.timeline-collapsed .zoom-controls {
-    top: 40%;
+    top: 30%;
     transform: translateY(-50%);
   }
 
@@ -1586,7 +1618,6 @@ button.danger:disabled {
     width: 2.75rem;
     height: 2.75rem;
   }
-}
 
   .timeline {
     gap: 0.75rem;

@@ -469,7 +469,6 @@ test.describe('Toolbar interactions', () => {
 
     await setTool(page, 'select');
 
-    const canvasRect = await getCanvasRect(page);
     const [first, second] = await page.evaluate(() =>
       window.animatorState.shapes.map((shape) => ({
         id: shape.id,
@@ -478,19 +477,16 @@ test.describe('Toolbar interactions', () => {
       })),
     );
 
-    const secondCenterX = canvasRect.x + second.centerX;
-    const secondCenterY = canvasRect.y + second.centerY;
-    await page.mouse.move(secondCenterX, secondCenterY);
-    await page.mouse.down();
-    await page.mouse.up();
+    // Click the second shape to select it
+    await page.locator('#stage').click({ position: { x: second.centerX, y: second.centerY } });
     await ensureSelectionCount(page, 1);
 
-    const firstCenterX = canvasRect.x + first.centerX;
-    const firstCenterY = canvasRect.y + first.centerY;
+    // Shift-click the first shape to add it to selection
     await page.keyboard.down('Shift');
-    await page.mouse.move(firstCenterX, firstCenterY);
-    await page.mouse.down();
-    await page.mouse.up();
+    await page.locator('#stage').click({ 
+      position: { x: first.centerX, y: first.centerY },
+      modifiers: ['Shift']
+    });
     await page.keyboard.up('Shift');
 
     await expect.poll(() => page.evaluate(() => window.animatorState.selectedIds.size)).toBe(2);
@@ -518,24 +514,26 @@ test.describe('Toolbar interactions', () => {
     );
 
     const [first, second] = shapeSummaries;
-    const modifierKey = await page.evaluate(() => (/mac/i.test(navigator.platform || '') ? 'Meta' : 'Control'));
+    const isMac = await page.evaluate(() => /mac/i.test(navigator.platform || ''));
 
+    // Click second shape to select it
     const secondCenterX = canvasRect.x + second.centerX;
     const secondCenterY = canvasRect.y + second.centerY;
-    await page.mouse.move(secondCenterX, secondCenterY);
-    await page.mouse.down();
-    await page.mouse.up();
+    await dispatchPointerEvent(page, 'pointerdown', secondCenterX, secondCenterY);
+    await dispatchPointerEvent(page, 'pointerup', secondCenterX, secondCenterY);
     await ensureSelectionCount(page, 1);
 
+    // Ctrl+click (or cmd+click on Mac) first shape to add to selection
     const firstCenterX = canvasRect.x + first.centerX;
     const firstCenterY = canvasRect.y + first.centerY;
-    await page.keyboard.down(modifierKey);
-    await page.waitForTimeout(50); // Wait for modifier to register
-    await page.mouse.move(firstCenterX, firstCenterY);
-    await page.mouse.down();
-    await page.mouse.up();
-    await page.waitForTimeout(100); // Wait for click to process
-    await page.keyboard.up(modifierKey);
+    await dispatchPointerEvent(page, 'pointerdown', firstCenterX, firstCenterY, {
+      ctrlKey: !isMac,
+      metaKey: isMac,
+    });
+    await dispatchPointerEvent(page, 'pointerup', firstCenterX, firstCenterY, {
+      ctrlKey: !isMac,
+      metaKey: isMac,
+    });
 
     await expect.poll(() => page.evaluate(() => window.animatorState.selectedIds.size)).toBe(2);
   });
@@ -720,7 +718,7 @@ test.describe('Toolbar interactions', () => {
     await stage.click({ position: { x: 10, y: 10 } });
     await ensureSelectionCount(page, 0);
 
-    await stage.click({ button: 'right', position: { x: 20, y: 20 } });
+    await stage.dispatchEvent('contextmenu', { clientX: 20, clientY: 20 });
 
     await pressShortcut(page, 'v');
 
@@ -1188,17 +1186,26 @@ test.describe('Toolbar interactions', () => {
     expect(selectionCenter).not.toBeNull();
     if (!selectionCenter) throw new Error('Selection center unavailable');
 
-    await page.mouse.move(selectionCenter.x, selectionCenter.y);
-    await page.mouse.down();
+    await dispatchPointerEvent(page, 'pointerdown', selectionCenter.x, selectionCenter.y);
+    await page.waitForTimeout(100); // Wait for pointer state to update
 
     const pointerState = await page.evaluate(() => ({
       down: window.animatorState.pointer?.down ?? false,
       mode: window.animatorState.pointer?.mode ?? null,
     }));
+    
     expect(pointerState.down).toBeTruthy();
     expect(pointerState.mode).toBe('moving');
 
-    await page.mouse.move(selectionCenter.x + 80, selectionCenter.y + 50, { steps: 12 });
+    // Use pointer events for dragging to maintain consistency
+    const steps = 12;
+    for (let i = 1; i <= steps; i++) {
+      const progress = i / steps;
+      const x = selectionCenter.x + (80 * progress);
+      const y = selectionCenter.y + (50 * progress);
+      await dispatchPointerEvent(page, 'pointermove', x, y);
+      await page.waitForTimeout(10);
+    }
 
     const movedDuringDrag = await page.evaluate((id) => {
       const shape = window.animatorState.shapes.find((entry) => entry.id === id);
@@ -1210,7 +1217,7 @@ test.describe('Toolbar interactions', () => {
     expect(Math.abs(movedDuringDrag.x - initialPosition.x)).toBeGreaterThanOrEqual(40);
     expect(Math.abs(movedDuringDrag.y - initialPosition.y)).toBeGreaterThanOrEqual(25);
 
-    await page.mouse.up();
+    await dispatchPointerEvent(page, 'pointerup', selectionCenter.x + 80, selectionCenter.y + 50);
     await page.waitForTimeout(50);
 
     const movedPosition = await page.evaluate((id) => {
