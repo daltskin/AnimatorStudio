@@ -70,7 +70,8 @@ test.describe('Tips panel', () => {
 
     // Click outside the panel (on canvas) - wait a moment for click-outside handler to be attached
     await page.waitForTimeout(150);
-    await page.locator('#stage').click();
+    // Click on the right side of the canvas to avoid tips panel overlap
+    await page.locator('#stage').click({ position: { x: 700, y: 300 } });
     await expect(panel).not.toBeVisible();
 
     // Re-open panel to test clicking on toolbar (should also close)

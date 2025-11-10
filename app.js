@@ -928,7 +928,7 @@ function computeAutoFitSize() {
   const baseWidth = Number.isFinite(state.stage.width) && state.stage.width > 0 ? state.stage.width : fallback.width || canvas.width;
   const baseHeight = Number.isFinite(state.stage.height) && state.stage.height > 0 ? state.stage.height : fallback.height || canvas.height;
   const aspect = baseWidth > 0 && baseHeight > 0 ? baseWidth / baseHeight : 16 / 9;
-  const margin = 20; // 10px margin on each side
+  const margin = 16; // 8px margin on each side for a small, even border
 
   const availableWidth = wrapper ? Math.max(state.stage.minWidth, wrapper.width - margin) : fallback.width || baseWidth;
   const availableHeight = wrapper ? Math.max(state.stage.minHeight, wrapper.height - margin) : fallback.height || baseHeight;
@@ -1657,12 +1657,21 @@ function fillPathWithStyle(context, style = {}, buildPath) {
     return;
   }
 
+  // First draw an opaque background to mask underlying shapes
+  buildPath();
+  withGlobalOpacity(context, opacity, () => {
+    context.fillStyle = "#ffffff"; // Use white background to fully mask underlying content
+    context.fill();
+  });
+
+  // Then draw the semi-transparent colored base
   buildPath();
   withGlobalOpacity(context, opacity * PATTERN_BASE_ALPHA, () => {
     context.fillStyle = rawColor;
     context.fill();
   });
 
+  // Finally draw the pattern
   const pattern = getFillPattern(context, rawColor, resolvedStyle);
   if (pattern) {
     buildPath();

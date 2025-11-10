@@ -143,6 +143,15 @@ function fillPathWithStyle(context, style = {}, buildPath) {
 
   const opacity = clampUnit(typeof style.opacity === "number" ? style.opacity : state.style?.opacity ?? 1);
 
+  // First draw an opaque background to mask underlying shapes
+  buildPath();
+  context.save();
+  context.fillStyle = "#ffffff"; // Use white background to fully mask underlying content
+  context.globalAlpha = opacity;
+  context.fill();
+  context.restore();
+
+  // Then draw the semi-transparent colored base
   buildPath();
   context.save();
   context.fillStyle = rawColor;
@@ -150,6 +159,7 @@ function fillPathWithStyle(context, style = {}, buildPath) {
   context.fill();
   context.restore();
 
+  // Finally draw the pattern
   const pattern = getFillPattern(context, rawColor, resolvedStyle);
   if (pattern) {
     buildPath();
