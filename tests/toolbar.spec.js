@@ -715,7 +715,7 @@ test.describe('Toolbar interactions', () => {
     await waitForClipboardItems(page, 1);
 
     const stage = page.locator('#stage');
-    await stage.click({ position: { x: 10, y: 10 } });
+    await stage.click({ position: { x: 500, y: 300 } });
     await ensureSelectionCount(page, 0);
 
     await stage.dispatchEvent('contextmenu', { clientX: 20, clientY: 20 });

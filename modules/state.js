@@ -2,8 +2,8 @@ import { canvas, defaultTool, elements, getInitialOption } from "./dom.js";
 import { DEFAULT_TIMELINE_DURATION } from "./constants.js";
 import { normalizeDegrees, degreesToRadians, rotatePointAround } from "./math.js";
 
-const DEFAULT_STAGE_WIDTH = canvas ? Number(canvas.getAttribute("width")) || 1280 : 1280;
-const DEFAULT_STAGE_HEIGHT = canvas ? Number(canvas.getAttribute("height")) || 720 : 720;
+const DEFAULT_STAGE_WIDTH = canvas ? Number(canvas.getAttribute("width")) || 800 : 800;
+const DEFAULT_STAGE_HEIGHT = canvas ? Number(canvas.getAttribute("height")) || 600 : 600;
 const MIN_STAGE_WIDTH = 320;
 const MIN_STAGE_HEIGHT = 240;
 const MAX_STAGE_WIDTH = 4096;
