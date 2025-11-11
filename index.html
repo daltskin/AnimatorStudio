@@ -417,8 +417,21 @@
             <header class="timeline-header">
               <div class="timeline-controls">
                 <div class="timeline-controls-left">
-                  <button id="playToggle" class="primary" title="Play or pause the animation">Play</button>
-                  <button id="stopPlayback" class="ghost" title="Stop playback and reset">Stop</button>
+                  <button id="playToggle" class="primary" title="Play or pause the animation">
+                    <span class="sr-only">Play</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="play">
+                      <path d="M8 5v14l11-7z" fill="currentColor"></path>
+                    </svg>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" data-icon="pause" style="display: none;">
+                      <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" fill="currentColor"></path>
+                    </svg>
+                  </button>
+                  <button id="stopPlayback" class="ghost" title="Stop playback and reset">
+                    <span class="sr-only">Stop</span>
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path d="M6 6h12v12H6z" fill="currentColor"></path>
+                    </svg>
+                  </button>
                   <button id="addKeyframe" class="ghost" disabled title="Add a keyframe at the current time">Add keyframe</button>
                   <button id="deleteKeyframe" class="ghost" disabled title="Delete keyframe at the current time">Delete keyframe</button>
                 </div>

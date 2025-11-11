@@ -1440,6 +1440,12 @@ function render() {
 
   ctx.save();
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  
+  // Draw background color to canvas context
+  const backgroundColor = state.stage.background || DEFAULT_STAGE_BACKGROUND;
+  ctx.fillStyle = backgroundColor;
+  ctx.fillRect(0, 0, state.stage.width, state.stage.height);
+  
   if (state.stage.showGrid) {
     drawBackgroundGrid(ctx);
   }
@@ -8330,11 +8336,23 @@ function blendSnapshots(a, b, t) {
 function togglePlayback() {
   state.timeline.isPlaying = !state.timeline.isPlaying;
   if (state.timeline.isPlaying) {
-    elements.playToggle.textContent = "Pause";
+    const playIcon = elements.playToggle.querySelector('[data-icon="play"]');
+    const pauseIcon = elements.playToggle.querySelector('[data-icon="pause"]');
+    const srText = elements.playToggle.querySelector('.sr-only');
+    if (playIcon) playIcon.style.display = "none";
+    if (pauseIcon) pauseIcon.style.display = "";
+    if (srText) srText.textContent = "Pause";
+    elements.playToggle.title = "Pause the animation";
     state.timeline.lastTick = null;
     state.timeline.direction = 1;
   } else {
-    elements.playToggle.textContent = "Play";
+    const playIcon = elements.playToggle.querySelector('[data-icon="play"]');
+    const pauseIcon = elements.playToggle.querySelector('[data-icon="pause"]');
+    const srText = elements.playToggle.querySelector('.sr-only');
+    if (playIcon) playIcon.style.display = "";
+    if (pauseIcon) pauseIcon.style.display = "none";
+    if (srText) srText.textContent = "Play";
+    elements.playToggle.title = "Play the animation";
     state.timeline.direction = 1;
   }
   elements.playToggle.setAttribute("aria-pressed", String(state.timeline.isPlaying));
@@ -8344,7 +8362,13 @@ function stopPlayback() {
   state.timeline.isPlaying = false;
   state.timeline.lastTick = null;
   state.timeline.direction = 1;
-  elements.playToggle.textContent = "Play";
+  const playIcon = elements.playToggle.querySelector('[data-icon="play"]');
+  const pauseIcon = elements.playToggle.querySelector('[data-icon="pause"]');
+  const srText = elements.playToggle.querySelector('.sr-only');
+  if (playIcon) playIcon.style.display = "";
+  if (pauseIcon) pauseIcon.style.display = "none";
+  if (srText) srText.textContent = "Play";
+  elements.playToggle.title = "Play the animation";
   elements.playToggle.setAttribute("aria-pressed", "false");
 }
 
@@ -8380,10 +8404,7 @@ function advanceTimelineBy(deltaSeconds) {
       state.timeline.direction = -1;
     } else if (updated <= 0) {
       updated = 0;
-      // Bounce should stop after returning to the beginning
-      setTimelineTime(updated, { apply: true });
-      stopPlayback();
-      return state.timeline.current;
+      state.timeline.direction = 1;
     }
   } else if (state.timeline.loop) {
     if (updated > duration) {
@@ -9610,6 +9631,12 @@ function renderFrameToContext(targetCtx) {
 
   targetCtx.save();
   targetCtx.scale(ratio, ratio);
+  
+  // Draw background color to match canvas display
+  const backgroundColor = state.stage.background || DEFAULT_STAGE_BACKGROUND;
+  targetCtx.fillStyle = backgroundColor;
+  targetCtx.fillRect(0, 0, state.stage.width, state.stage.height);
+  
   drawShapes(targetCtx);
   targetCtx.restore();
 }
